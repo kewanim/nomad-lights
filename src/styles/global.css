@@ -16,6 +16,9 @@
   --radius-lg:   24px;
   --font:        -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
                  "Helvetica Neue", Arial, sans-serif;
+  --blue:        #0071e3;  /* Apple blue  */
+  --green:       #34c759;  /* Apple green */
+  --red:         #ff3b30;  /* Apple red   */
   --ease:        cubic-bezier(0.4, 0, 0.2, 1);
   --shadow-sm:   0 2px 8px rgba(0,0,0,0.07);
   --shadow-md:   0 8px 32px rgba(0,0,0,0.10);
@@ -813,54 +816,22 @@ button{ font: inherit; cursor: pointer; border: none; background: none; }
 }
 .admin-image-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 14px;
 }
+
+/* ── Image card base — overridden below with richer styles ── */
 .admin-image-card {
-  background: var(--light);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-.admin-image-card img {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
-  display: block;
-}
-.admin-image-card-info {
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.admin-image-card-cat {
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--gray);
-}
-.admin-image-card-title { font-size: 0.84rem; font-weight: 500; }
-.admin-image-card-info select {
-  font-size: 0.8rem;
-  padding: 6px 9px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
   background: var(--white);
-  color: var(--black);
-  outline: none;
-  cursor: pointer;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  transition: box-shadow 0.25s var(--ease), transform 0.25s var(--ease);
 }
-.admin-image-card-info button {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: #c0392b;
-  transition: opacity 0.2s;
+.admin-image-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
-.admin-image-card-info button:hover { opacity: 0.65; }
 .admin-empty {
   text-align: center;
   padding: 56px 0;
@@ -983,7 +954,7 @@ button{ font: inherit; cursor: pointer; border: none; background: none; }
   transition: background 0.2s, color 0.2s;
 }
 .admin-gallery-filter-btn:hover { background: var(--border); color: var(--black); }
-.admin-gallery-filter-btn.active { background: var(--black); color: var(--white); }
+.admin-gallery-filter-btn.active { background: var(--blue); color: var(--white); }
 .admin-filter-count {
   font-size: 0.72rem;
   opacity: 0.6;
@@ -1181,3 +1152,356 @@ button{ font: inherit; cursor: pointer; border: none; background: none; }
     mask-image: linear-gradient(to right, transparent 0%, black 3%, black 97%, transparent 100%);
   }
 }
+
+/* ============================================================
+   HERO ENTRANCE ANIMATION
+   ============================================================ */
+@keyframes hero-fade-up {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.hero-eyebrow  { animation: hero-fade-up 0.65s var(--ease) 0.05s both; }
+.hero h1       { animation: hero-fade-up 0.7s  var(--ease) 0.13s both; }
+.hero-sub      { animation: hero-fade-up 0.65s var(--ease) 0.21s both; }
+.hero-actions  { animation: hero-fade-up 0.65s var(--ease) 0.28s both; }
+.hero-image-wrap { animation: hero-fade-up 0.85s var(--ease) 0.38s both; }
+
+/* ============================================================
+   SCROLL REVEAL  (Intersection Observer driven)
+   ============================================================ */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.65s var(--ease), transform 0.65s var(--ease);
+}
+[data-reveal].revealed {
+  opacity: 1;
+  transform: none;
+}
+/* Stagger helpers — add data-delay="1..5" alongside data-reveal */
+[data-reveal][data-delay="1"] { transition-delay: 0.07s; }
+[data-reveal][data-delay="2"] { transition-delay: 0.14s; }
+[data-reveal][data-delay="3"] { transition-delay: 0.21s; }
+[data-reveal][data-delay="4"] { transition-delay: 0.28s; }
+[data-reveal][data-delay="5"] { transition-delay: 0.35s; }
+
+/* ============================================================
+   ADMIN — IMAGE CARD  (hover overlay + expandable panel)
+   ============================================================ */
+.admin-image-card-img-wrap {
+  position: relative;
+  overflow: hidden;
+}
+.admin-image-card-img-wrap img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.35s var(--ease);
+}
+.admin-image-card:hover .admin-image-card-img-wrap img {
+  transform: scale(1.04);
+}
+
+/* Overlay — appears on hover */
+.admin-image-card-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 10px;
+  gap: 7px;
+  opacity: 0;
+  transition: opacity 0.22s var(--ease), background 0.22s var(--ease);
+  pointer-events: none;
+}
+.admin-image-card:hover .admin-image-card-overlay {
+  opacity: 1;
+  background: rgba(0,0,0,0.26);
+  pointer-events: auto;
+}
+
+.admin-img-overlay-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: transform 0.15s var(--ease);
+}
+.admin-img-overlay-btn:hover { transform: scale(1.12); }
+.admin-img-overlay-btn.edit   {
+  background: rgba(255,255,255,0.22);
+  border: 1px solid rgba(255,255,255,0.4);
+}
+.admin-img-overlay-btn.delete {
+  background: rgba(255,59,48,0.78);
+  border: 1px solid rgba(255,59,48,0.35);
+}
+
+/* Compact info strip below image */
+.admin-image-card-compact {
+  padding: 11px 13px 12px;
+}
+.admin-image-card-title-text {
+  font-size: 0.87rem;
+  font-weight: 600;
+  color: var(--black);
+  letter-spacing: -0.01em;
+  margin-bottom: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.admin-image-card-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.admin-chip {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 980px;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+.cat-chip    {
+  background: var(--light);
+  color: var(--gray);
+  border: 1px solid var(--border);
+}
+.folder-chip {
+  background: rgba(0,113,227,0.08);
+  color: var(--blue);
+  border: 1px solid rgba(0,113,227,0.18);
+}
+
+/* Expandable edit panel — slides in below */
+.admin-image-card-panel {
+  padding: 13px;
+  border-top: 1px solid var(--border);
+  background: var(--light);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: admin-panel-in 0.18s var(--ease);
+}
+@keyframes admin-panel-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.admin-panel-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.admin-panel-field label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gray);
+}
+.admin-panel-field input,
+.admin-panel-field select {
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.84rem;
+  background: var(--white);
+  color: var(--black);
+  outline: none;
+  font-family: var(--font);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.admin-panel-field input:focus,
+.admin-panel-field select:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(0,113,227,0.11);
+}
+.admin-panel-input-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.admin-panel-input-row input { flex: 1; }
+
+/* Icon action button (pencil / check / x used across admin) */
+.admin-icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--gray);
+  background: var(--white);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.12s;
+}
+.admin-icon-btn:hover { background: var(--light); color: var(--black); transform: scale(1.05); }
+.admin-icon-btn.confirm {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+}
+.admin-icon-btn.confirm:hover { opacity: 0.85; transform: scale(1.05); }
+
+.admin-panel-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--gray);
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 0.2s;
+}
+.admin-panel-close:hover { color: var(--black); }
+
+/* ============================================================
+   ADMIN — CATEGORY ROW RENAME
+   ============================================================ */
+.admin-cat-row { align-items: center; }
+.admin-cat-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.admin-cat-rename-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gray);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.admin-cat-rename-btn:hover {
+  background: var(--white);
+  border-color: var(--border);
+  color: var(--black);
+}
+.admin-cat-rename-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex: 1;
+}
+.admin-cat-rename-input {
+  flex: 1;
+  padding: 6px 11px;
+  border: 1.5px solid var(--blue);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: var(--white);
+  color: var(--black);
+  outline: none;
+  font-family: var(--font);
+  box-shadow: 0 0 0 3px rgba(0,113,227,0.11);
+}
+
+/* ============================================================
+   ADMIN — FOLDER RENAME SECTION
+   ============================================================ */
+.admin-folder-rename-section {
+  background: var(--light);
+  border-radius: var(--radius-sm);
+  padding: 13px 16px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+}
+.admin-folder-rename-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gray);
+  margin-bottom: 10px;
+}
+.admin-folder-rename-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.admin-folder-rename-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--white);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+.admin-folder-rename-name {
+  flex: 1;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--black);
+  letter-spacing: -0.01em;
+}
+.admin-folder-rename-count {
+  font-size: 0.74rem;
+  color: var(--gray);
+}
+.admin-folder-rename-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1.5px solid var(--blue);
+  border-radius: 8px;
+  font-size: 0.84rem;
+  background: var(--white);
+  color: var(--black);
+  outline: none;
+  font-family: var(--font);
+  box-shadow: 0 0 0 3px rgba(0,113,227,0.11);
+}
+
+/* ============================================================
+   FORM FOCUS STATES — Apple blue ring everywhere
+   ============================================================ */
+.form-field input:focus {
+  border-color: var(--blue) !important;
+  box-shadow: 0 0 0 3px rgba(0,113,227,0.11) !important;
+}
+.admin-cat-add-input:focus {
+  border-color: var(--blue) !important;
+  box-shadow: 0 0 0 3px rgba(0,113,227,0.11) !important;
+}
+.admin-fields input:focus,
+.admin-fields select:focus {
+  border-color: var(--blue) !important;
+  box-shadow: 0 0 0 3px rgba(0,113,227,0.11) !important;
+}
+
+/* ============================================================
+   SERVICE CARDS — subtle border for depth
+   ============================================================ */
+.service-card { border: 1px solid var(--border); }
+
+/* ============================================================
+   SECTION TITLES — reveal-ready (opacity set by [data-reveal])
+   ============================================================ */
+.portfolio-section { scroll-margin-top: 60px; }
+

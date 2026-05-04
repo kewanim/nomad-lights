@@ -22,6 +22,38 @@ const DEFAULT_CATS = ["Portraits","Couples","Events","Proposals","Graduation"].m
 );
 
 /* ----------------------------------------------------------
+   useReveal — Intersection Observer scroll-reveal hook
+   Call with an array of deps; re-observes unreveal'd elements
+   whenever deps change (e.g. after async data loads).
+   ---------------------------------------------------------- */
+function useReveal(deps = []) {
+  useEffect(() => {
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("revealed");
+            io.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.08, rootMargin: "0px 0px -28px 0px" }
+    );
+    // Small delay so React has committed the DOM update
+    const timer = setTimeout(() => {
+      document
+        .querySelectorAll("[data-reveal]:not(.revealed)")
+        .forEach((el) => io.observe(el));
+    }, 60);
+    return () => {
+      clearTimeout(timer);
+      io.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+}
+
+/* ----------------------------------------------------------
    CategoryCard
    Cycles through ALL photos in that category with crossfade.
    Before loading finishes: shows nothing (no placeholder flash).
@@ -287,6 +319,9 @@ export default function PublicSite() {
     ? null
     : (allImages[1]?.imageUrl || FALLBACK.Couples || GENERIC_FALLBACK);
 
+  // Scroll reveal — re-run when loading finishes and categories populate
+  useReveal([loading, activeCategories.length]);
+
   function closeMenu() { setMenuOpen(false); }
 
   return (
@@ -368,8 +403,8 @@ export default function PublicSite() {
         {activeCategories.length > 0 && (
           <section id="portfolio" className="category-overview">
             <div className="container">
-              <p className="section-label">Browse sessions</p>
-              <h2 className="section-title">
+              <p className="section-label" data-reveal>Browse sessions</p>
+              <h2 className="section-title" data-reveal data-delay="1">
                 Every moment,<br />
                 <span>a different story.</span>
               </h2>
@@ -403,8 +438,8 @@ export default function PublicSite() {
         {/* ── Services ── */}
         <section id="services" className="services-section">
           <div className="container">
-            <p className="section-label">What I offer</p>
-            <h2 className="section-title">
+            <p className="section-label" data-reveal>What I offer</p>
+            <h2 className="section-title" data-reveal data-delay="1">
               Sessions for<br /><span>every moment.</span>
             </h2>
             <div className="services-grid">
@@ -415,7 +450,12 @@ export default function PublicSite() {
                 { name: "Proposals",   desc: "Secretly captured, beautifully remembered. Let the biggest question of your life be a perfect surprise." },
                 { name: "Graduation",  desc: "Mark the milestone with photos that honor the hard work and celebrate the moment." },
               ].map((s, i) => (
-                <article key={s.name} className="service-card">
+                <article
+                  key={s.name}
+                  className="service-card"
+                  data-reveal
+                  data-delay={String(i + 1)}
+                >
                   <p className="service-num">{String(i + 1).padStart(2, "0")}</p>
                   <h3>{s.name}</h3>
                   <p>{s.desc}</p>
@@ -429,7 +469,7 @@ export default function PublicSite() {
         <section id="about" className="about-section">
           <div className="container">
             <div className="about-inner">
-              <div className="about-copy">
+              <div className="about-copy" data-reveal>
                 <p className="section-label">About Nomad Lights</p>
                 <h2 className="section-title" style={{ marginBottom: 0 }}>
                   Minimal. Warm.<br /><span>Real.</span>
@@ -444,7 +484,7 @@ export default function PublicSite() {
                   proposal, and graduation sessions wherever the moment takes us.
                 </p>
               </div>
-              <div className="about-img">
+              <div className="about-img" data-reveal data-delay="2">
                 {loading ? (
                   <div className="skeleton" style={{ width: "100%", height: "100%" }} />
                 ) : aboutImage ? (
@@ -458,13 +498,13 @@ export default function PublicSite() {
         {/* ── Contact ── */}
         <section id="contact" className="contact-section">
           <div className="container">
-            <p className="section-label">Let's connect</p>
-            <h2 className="section-title">
+            <p className="section-label" data-reveal>Let's connect</p>
+            <h2 className="section-title" data-reveal data-delay="1">
               Ready to book<br /><span>your session?</span>
             </h2>
 
             {/* Contact details */}
-            <div className="contact-details-row">
+            <div className="contact-details-row" data-reveal data-delay="2">
               <div className="contact-detail-item">
                 <span className="contact-detail-label">Location</span>
                 <span className="contact-detail-value">DC · MD · VA</span>
@@ -486,13 +526,13 @@ export default function PublicSite() {
             </div>
 
             {/* Buttons */}
-            <div className="contact-actions">
+            <div className="contact-actions" data-reveal data-delay="3">
               <a href="mailto:kewanim40@gmail.com" className="btn btn-white">Send an Email</a>
               <a href="tel:2406885656"             className="btn btn-outline">Call or Text</a>
             </div>
 
             {/* Instagram + QR */}
-            <div className="contact-instagram-block">
+            <div className="contact-instagram-block" data-reveal data-delay="4">
               <a
                 href="https://www.instagram.com/nomad_lights_?igsh=MWg0YnY4dHF0NTE5eg%3D%3D&utm_source=qr"
                 target="_blank"

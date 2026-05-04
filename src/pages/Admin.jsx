@@ -10,6 +10,8 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  where,
+  writeBatch,
 } from "firebase/firestore";
 import {
   deleteObject,
@@ -18,11 +20,21 @@ import {
   uploadBytesResumable,
 } from "firebase/storage";
 import { signOut } from "firebase/auth";
-import { Eye, EyeOff, FolderPlus, Plus, Trash2, UploadCloud } from "lucide-react";
+import {
+  Check,
+  Edit2,
+  Eye,
+  EyeOff,
+  FolderPlus,
+  Plus,
+  Trash2,
+  UploadCloud,
+  X,
+} from "lucide-react";
 import { auth, db, storage } from "../firebase/firebase";
 
 /* ----------------------------------------------------------
-   Default categories — seeded into Firestore on first admin load
+   Default categories — seeded into Firestore on first load
    ---------------------------------------------------------- */
 const DEFAULT_CATEGORIES = [
   "Portraits",
@@ -75,7 +87,7 @@ async function compressImage(file, maxPx = 1920, quality = 0.82) {
 }
 
 /* ----------------------------------------------------------
-   Single image card in the gallery grid
+   AdminImageCard — hover overlay + expandable edit panel
    ---------------------------------------------------------- */
 function AdminImageCard({
   image,
@@ -84,9 +96,12 @@ function AdminImageCard({
   onDelete,
   onCategoryChange,
   onFolderChange,
+  onTitleChange,
 }) {
+  const [expanded,       setExpanded]       = useState(false);
+  const [editTitle,      setEditTitle]      = useState(image.title || "");
   const [creatingFolder, setCreatingFolder] = useState(false);
-  const [newFolderName, setNewFolderName]   = useState("");
+  const [newFolderName,  setNewFolderName]  = useState("");
 
   function handleFolderSelect(e) {
     if (e.target.value === "__new__") {
@@ -105,99 +120,150 @@ function AdminImageCard({
     }
   }
 
+  function saveTitle() {
+    const t = editTitle.trim();
+    if (t !== (image.title || "")) onTitleChange(image, t);
+  }
+
+  const displayTitle =
+    image.title && image.title !== image.category
+      ? image.title
+      : image.category;
+
   return (
-    <div className="admin-image-card">
-      <img
-        src={image.imageUrl}
-        alt={image.title || image.category}
-        loading="lazy"
-      />
-      <div className="admin-image-card-info">
-        <span className="admin-image-card-cat">{image.category}</span>
+    <div className={`admin-image-card${expanded ? " expanded" : ""}`}>
 
-        {image.folder && (
-          <span className="admin-folder-badge">📁 {image.folder}</span>
-        )}
-
-        <span className="admin-image-card-title">
-          {image.title || "Untitled"}
-        </span>
-
-        {/* Change category */}
-        <label
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 4,
-            fontSize: "0.76rem",
-            color: "var(--gray)",
-          }}
-        >
-          Category
-          <select
-            value={image.category || ""}
-            onChange={(e) => onCategoryChange(image, e.target.value)}
+      {/* ── Image + hover overlay ── */}
+      <div className="admin-image-card-img-wrap">
+        <img
+          src={image.imageUrl}
+          alt={displayTitle}
+          loading="lazy"
+        />
+        <div className="admin-image-card-overlay">
+          <button
+            className="admin-img-overlay-btn edit"
+            onClick={() => setExpanded((v) => !v)}
+            title={expanded ? "Close editor" : "Edit photo"}
           >
-            {allCategories.map((c) => (
-              <option key={c.id} value={c.name}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+            <Edit2 size={14} />
+          </button>
+          <button
+            className="admin-img-overlay-btn delete"
+            onClick={() => onDelete(image)}
+            title="Delete"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
 
-        {/* Change folder */}
-        <label
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 4,
-            fontSize: "0.76rem",
-            color: "var(--gray)",
-          }}
-        >
-          Folder
-          {creatingFolder ? (
-            <div className="admin-folder-input-row">
+      {/* ── Compact info strip ── */}
+      <div className="admin-image-card-compact">
+        <p className="admin-image-card-title-text">{displayTitle}</p>
+        <div className="admin-image-card-chips">
+          <span className="admin-chip cat-chip">{image.category}</span>
+          {image.folder && (
+            <span className="admin-chip folder-chip">📁 {image.folder}</span>
+          )}
+        </div>
+      </div>
+
+      {/* ── Expandable edit panel ── */}
+      {expanded && (
+        <div className="admin-image-card-panel">
+
+          {/* Title */}
+          <div className="admin-panel-field">
+            <label>Title</label>
+            <div className="admin-panel-input-row">
               <input
-                className="admin-folder-input"
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder="Folder name"
-                autoFocus
-                onKeyDown={(e) => e.key === "Enter" && confirmNewFolder()}
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveTitle()}
+                placeholder="Photo title…"
               />
-              <button className="admin-folder-save-btn" onClick={confirmNewFolder}>
-                Save
-              </button>
               <button
-                className="admin-folder-cancel-btn"
-                onClick={() => {
-                  setCreatingFolder(false);
-                  setNewFolderName("");
-                }}
+                className="admin-icon-btn confirm"
+                onClick={saveTitle}
+                title="Save title"
               >
-                ✕
+                <Check size={13} />
               </button>
             </div>
-          ) : (
-            <select value={image.folder || ""} onChange={handleFolderSelect}>
-              <option value="">No folder</option>
-              {foldersForCat.map((f) => (
-                <option key={f} value={f}>
-                  {f}
+          </div>
+
+          {/* Category */}
+          <div className="admin-panel-field">
+            <label>Category</label>
+            <select
+              value={image.category || ""}
+              onChange={(e) => onCategoryChange(image, e.target.value)}
+            >
+              {allCategories.map((c) => (
+                <option key={c.id} value={c.name}>
+                  {c.name}
                 </option>
               ))}
-              <option value="__new__">+ Create new folder…</option>
             </select>
-          )}
-        </label>
+          </div>
 
-        <button onClick={() => onDelete(image)}>
-          <Trash2 size={14} />
-          Delete
-        </button>
-      </div>
+          {/* Folder */}
+          <div className="admin-panel-field">
+            <label>Folder</label>
+            {creatingFolder ? (
+              <div className="admin-folder-input-row">
+                <input
+                  className="admin-folder-input"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder="New folder name"
+                  autoFocus
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && confirmNewFolder()
+                  }
+                />
+                <button
+                  className="admin-folder-save-btn"
+                  onClick={confirmNewFolder}
+                >
+                  Save
+                </button>
+                <button
+                  className="admin-folder-cancel-btn"
+                  onClick={() => {
+                    setCreatingFolder(false);
+                    setNewFolderName("");
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <select
+                value={image.folder || ""}
+                onChange={handleFolderSelect}
+              >
+                <option value="">No folder</option>
+                {foldersForCat.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+                <option value="__new__">+ Create new folder…</option>
+              </select>
+            )}
+          </div>
+
+          <button
+            className="admin-panel-close"
+            onClick={() => setExpanded(false)}
+          >
+            <X size={12} />
+            Done editing
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -208,24 +274,32 @@ function AdminImageCard({
 export default function Admin({ user }) {
   // ── Firestore state ─────────────────────────────────────
   const [categories, setCategories] = useState([]);
-  const [images, setImages]         = useState([]);
+  const [images,     setImages]     = useState([]);
 
   // ── Upload form state ────────────────────────────────────
-  const [uploadCat, setUploadCat]               = useState("");
-  const [uploadFolder, setUploadFolder]         = useState("");
-  const [creatingUploadFolder, setCreatingUploadFolder] = useState(false);
-  const [newUploadFolder, setNewUploadFolder]   = useState("");
-  const [title, setTitle]                       = useState("");
-  const [status, setStatus]                     = useState("");
-  const [uploading, setUploading]               = useState(false);
-  const [dragOver, setDragOver]                 = useState(false);
+  const [uploadCat,              setUploadCat]              = useState("");
+  const [uploadFolder,           setUploadFolder]           = useState("");
+  const [creatingUploadFolder,   setCreatingUploadFolder]   = useState(false);
+  const [newUploadFolder,        setNewUploadFolder]        = useState("");
+  const [title,                  setTitle]                  = useState("");
+  const [status,                 setStatus]                 = useState("");
+  const [uploading,              setUploading]              = useState(false);
+  const [dragOver,               setDragOver]               = useState(false);
 
   // ── Gallery filter ───────────────────────────────────────
   const [galleryFilter, setGalleryFilter] = useState("All");
 
   // ── New category form ────────────────────────────────────
-  const [newCatName, setNewCatName] = useState("");
-  const [savingCat, setSavingCat]   = useState(false);
+  const [newCatName,  setNewCatName]  = useState("");
+  const [savingCat,   setSavingCat]   = useState(false);
+
+  // ── Rename category ──────────────────────────────────────
+  const [renamingCatId,    setRenamingCatId]    = useState(null);
+  const [renameCatValue,   setRenameCatValue]   = useState("");
+
+  // ── Rename folder ────────────────────────────────────────
+  const [renamingFolder,       setRenamingFolder]       = useState(null);
+  const [renameFolderValue,    setRenameFolderValue]    = useState("");
 
   /* ── Seed default categories on first admin load ─────── */
   useEffect(() => {
@@ -247,7 +321,7 @@ export default function Admin({ user }) {
       }
     }
     seedIfEmpty();
-  }, []); // runs once
+  }, []);
 
   /* ── Listen: categories ──────────────────────────────── */
   useEffect(() => {
@@ -255,7 +329,6 @@ export default function Admin({ user }) {
     return onSnapshot(q, (snap) => {
       const cats = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setCategories(cats);
-      // Auto-select first category for upload if nothing selected yet
       setUploadCat((prev) => prev || cats[0]?.name || DEFAULT_CATEGORIES[0]);
     });
   }, []);
@@ -273,11 +346,10 @@ export default function Admin({ user }) {
     ? categories.map((c) => c.name)
     : DEFAULT_CATEGORIES;
 
-  // Unique sorted folder names per category
   const foldersByCat = useMemo(() => {
     const map = {};
     categoryNames.forEach((cat) => {
-      const folders = [
+      map[cat] = [
         ...new Set(
           images
             .filter((img) => img.category === cat)
@@ -285,12 +357,10 @@ export default function Admin({ user }) {
             .filter(Boolean)
         ),
       ].sort();
-      map[cat] = folders;
     });
     return map;
   }, [categoryNames, images]);
 
-  // Image count per category (for filter badges + category panel)
   const countByCat = useMemo(() => {
     const map = { All: images.length };
     categoryNames.forEach((cat) => {
@@ -299,7 +369,6 @@ export default function Admin({ user }) {
     return map;
   }, [categoryNames, images]);
 
-  // Filtered images for gallery view
   const filteredImages = useMemo(() => {
     return galleryFilter === "All"
       ? images
@@ -315,14 +384,10 @@ export default function Admin({ user }) {
       setStatus("Please choose image files only.");
       return;
     }
-
-    // Resolve folder name for this upload batch
     const folderToUse = creatingUploadFolder
       ? newUploadFolder.trim()
       : uploadFolder;
-
     setUploading(true);
-
     for (const file of selected) {
       try {
         setStatus(`Compressing ${file.name}…`);
@@ -330,14 +395,10 @@ export default function Admin({ user }) {
         const origMB = (file.size / 1024 / 1024).toFixed(1);
         const compMB = (compressed.size / 1024 / 1024).toFixed(1);
         setStatus(`Uploading ${file.name} (${origMB} MB → ${compMB} MB)…`);
-
-        const safeName = compressed.name
-          .replace(/[^a-z0-9.-]/gi, "-")
-          .toLowerCase();
-        const filePath   = `gallery/${Date.now()}-${safeName}`;
-        const storageRef = ref(storage, filePath);
-        const uploadTask = uploadBytesResumable(storageRef, compressed);
-
+        const safeName  = compressed.name.replace(/[^a-z0-9.-]/gi, "-").toLowerCase();
+        const filePath  = `gallery/${Date.now()}-${safeName}`;
+        const storRef   = ref(storage, filePath);
+        const uploadTask = uploadBytesResumable(storRef, compressed);
         await new Promise((resolve, reject) => {
           uploadTask.on(
             "state_changed",
@@ -351,9 +412,7 @@ export default function Admin({ user }) {
             resolve
           );
         });
-
-        const imageUrl = await getDownloadURL(storageRef);
-
+        const imageUrl = await getDownloadURL(storRef);
         await addDoc(collection(db, "gallery"), {
           title:       title || uploadCat,
           category:    uploadCat,
@@ -363,13 +422,11 @@ export default function Admin({ user }) {
           createdAt:   serverTimestamp(),
           createdBy:   user.email,
         });
-
         setStatus(`✓ ${file.name} uploaded`);
       } catch {
         setStatus(`Upload failed for ${file.name}. Please try again.`);
       }
     }
-
     setTitle("");
     setCreatingUploadFolder(false);
     setNewUploadFolder("");
@@ -394,7 +451,7 @@ export default function Admin({ user }) {
     try {
       await updateDoc(doc(db, "gallery", image.id), {
         category: newCat,
-        folder:   "",   // folder belongs to a category, reset on move
+        folder:   "",
       });
     } catch {
       alert("Could not update category.");
@@ -410,10 +467,23 @@ export default function Admin({ user }) {
     }
   }
 
+  /* ── Change photo title ──────────────────────────────── */
+  async function changeTitle(image, newTitle) {
+    try {
+      await updateDoc(doc(db, "gallery", image.id), {
+        title: newTitle || image.category,
+      });
+    } catch {
+      alert("Could not update title.");
+    }
+  }
+
   /* ── Toggle category visibility ─────────────────────── */
   async function toggleVisibility(cat) {
     try {
-      await updateDoc(doc(db, "categories", cat.id), { visible: !cat.visible });
+      await updateDoc(doc(db, "categories", cat.id), {
+        visible: !cat.visible,
+      });
     } catch {
       alert("Could not update visibility.");
     }
@@ -423,11 +493,7 @@ export default function Admin({ user }) {
   async function addCategory() {
     const name = newCatName.trim();
     if (!name) return;
-    if (
-      categories.some(
-        (c) => c.name.toLowerCase() === name.toLowerCase()
-      )
-    ) {
+    if (categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
       alert("A category with that name already exists.");
       return;
     }
@@ -435,7 +501,7 @@ export default function Admin({ user }) {
       setSavingCat(true);
       await addDoc(collection(db, "categories"), {
         name,
-        visible:   false, // hidden by default until you add photos & turn it on
+        visible:   false,
         order:     categories.length,
         createdAt: serverTimestamp(),
       });
@@ -447,11 +513,60 @@ export default function Admin({ user }) {
     }
   }
 
-  /* ── Folder shorthand ────────────────────────────────── */
-  const currentFolders = foldersByCat[uploadCat] || [];
-  const resolvedUploadFolder = creatingUploadFolder
-    ? newUploadFolder
-    : uploadFolder;
+  /* ── Rename category (batch: doc + all images) ───────── */
+  async function renameCategory(cat, newName) {
+    newName = newName.trim();
+    if (!newName || newName === cat.name) {
+      setRenamingCatId(null);
+      return;
+    }
+    if (
+      categories.some(
+        (c) => c.id !== cat.id && c.name.toLowerCase() === newName.toLowerCase()
+      )
+    ) {
+      alert("A category with that name already exists.");
+      return;
+    }
+    try {
+      const batch = writeBatch(db);
+      batch.update(doc(db, "categories", cat.id), { name: newName });
+      const q    = query(collection(db, "gallery"), where("category", "==", cat.name));
+      const snap = await getDocs(q);
+      snap.docs.forEach((d) => batch.update(d.ref, { category: newName }));
+      await batch.commit();
+      setRenamingCatId(null);
+    } catch {
+      alert("Could not rename category.");
+    }
+  }
+
+  /* ── Rename folder (batch: all matching images) ──────── */
+  async function renameFolder(catName, oldFolder, newFolder) {
+    newFolder = newFolder.trim();
+    if (!newFolder || newFolder === oldFolder) {
+      setRenamingFolder(null);
+      return;
+    }
+    try {
+      const batch = writeBatch(db);
+      const q     = query(
+        collection(db, "gallery"),
+        where("category", "==", catName),
+        where("folder",   "==", oldFolder)
+      );
+      const snap = await getDocs(q);
+      snap.docs.forEach((d) => batch.update(d.ref, { folder: newFolder }));
+      await batch.commit();
+      setRenamingFolder(null);
+    } catch {
+      alert("Could not rename folder.");
+    }
+  }
+
+  /* ── Shorthand ───────────────────────────────────────── */
+  const currentFolders        = foldersByCat[uploadCat] || [];
+  const resolvedUploadFolder  = creatingUploadFolder ? newUploadFolder : uploadFolder;
 
   /* ─────────────────────────────────────────────────────── */
   return (
@@ -478,49 +593,98 @@ export default function Admin({ user }) {
         <div className="admin-panel">
           <h2>Session categories</h2>
           <p>
-            Toggle visibility to show or hide a session type on your website.
-            New categories are hidden by default — turn them on once you've
-            added photos.
+            Toggle visibility to show/hide a session on your website. Click the{" "}
+            <strong>pencil</strong> to rename. New categories are hidden by default
+            until you turn them on.
           </p>
 
           <div className="admin-cat-list">
             {categories.map((cat) => {
-              const count = countByCat[cat.name] ?? 0;
+              const count      = countByCat[cat.name] ?? 0;
+              const isRenaming = renamingCatId === cat.id;
+
               return (
                 <div key={cat.id} className="admin-cat-row">
                   <div
                     className="admin-cat-dot"
                     style={{
-                      background: cat.visible ? "#34c759" : "var(--border)",
+                      background: cat.visible ? "var(--green)" : "var(--border)",
                     }}
                   />
+
                   <div className="admin-cat-info">
-                    <span className="admin-cat-name">{cat.name}</span>
-                    <span className="admin-cat-count">
-                      {count} photo{count !== 1 ? "s" : ""}
-                      {count === 0 && (
-                        <span className="admin-cat-hidden-note">
-                          {" "}· hidden on website
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <button
-                    className="admin-cat-toggle"
-                    onClick={() => toggleVisibility(cat)}
-                    title={
-                      cat.visible
-                        ? "Click to hide from website"
-                        : "Click to show on website"
-                    }
-                  >
-                    {cat.visible ? (
-                      <Eye size={15} strokeWidth={1.75} />
+                    {isRenaming ? (
+                      <div className="admin-cat-rename-row">
+                        <input
+                          className="admin-cat-rename-input"
+                          value={renameCatValue}
+                          autoFocus
+                          onChange={(e) => setRenameCatValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") renameCategory(cat, renameCatValue);
+                            if (e.key === "Escape") setRenamingCatId(null);
+                          }}
+                        />
+                        <button
+                          className="admin-icon-btn confirm"
+                          onClick={() => renameCategory(cat, renameCatValue)}
+                          title="Save"
+                        >
+                          <Check size={13} />
+                        </button>
+                        <button
+                          className="admin-icon-btn"
+                          onClick={() => setRenamingCatId(null)}
+                          title="Cancel"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
                     ) : (
-                      <EyeOff size={15} strokeWidth={1.75} />
+                      <>
+                        <span className="admin-cat-name">{cat.name}</span>
+                        <span className="admin-cat-count">
+                          {count} photo{count !== 1 ? "s" : ""}
+                          {count === 0 && (
+                            <span className="admin-cat-hidden-note">
+                              {" "}· hidden on website
+                            </span>
+                          )}
+                        </span>
+                      </>
                     )}
-                    <span>{cat.visible ? "Visible" : "Hidden"}</span>
-                  </button>
+                  </div>
+
+                  <div className="admin-cat-actions">
+                    {!isRenaming && (
+                      <button
+                        className="admin-cat-rename-btn"
+                        onClick={() => {
+                          setRenamingCatId(cat.id);
+                          setRenameCatValue(cat.name);
+                        }}
+                        title="Rename category"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                    )}
+                    <button
+                      className="admin-cat-toggle"
+                      onClick={() => toggleVisibility(cat)}
+                      title={
+                        cat.visible
+                          ? "Click to hide from website"
+                          : "Click to show on website"
+                      }
+                    >
+                      {cat.visible ? (
+                        <Eye size={15} strokeWidth={1.75} />
+                      ) : (
+                        <EyeOff size={15} strokeWidth={1.75} />
+                      )}
+                      <span>{cat.visible ? "Visible" : "Hidden"}</span>
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -550,8 +714,8 @@ export default function Admin({ user }) {
         <div className="admin-panel">
           <h2>Add photos</h2>
           <p>
-            Images are auto-compressed before uploading. You can assign a
-            category and optionally place them in a folder within that category.
+            Images are auto-compressed before uploading. Assign a category and
+            optionally place them in a folder within that category.
           </p>
 
           {/* Category + title */}
@@ -627,8 +791,7 @@ export default function Admin({ user }) {
                 <button
                   className="admin-folder-save-btn"
                   onClick={() => {
-                    if (newUploadFolder.trim())
-                      setCreatingUploadFolder(false);
+                    if (newUploadFolder.trim()) setCreatingUploadFolder(false);
                   }}
                 >
                   Save
@@ -649,10 +812,7 @@ export default function Admin({ user }) {
           {/* Drop zone */}
           <label
             className={dragOver ? "drop-zone drag-active" : "drop-zone"}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={(e) => {
               e.preventDefault();
@@ -671,15 +831,12 @@ export default function Admin({ user }) {
             />
           </label>
 
-          {/* Upload destination preview */}
           {uploadCat && (
             <p className="admin-upload-destination">
-              → Uploading to{" "}
-              <strong>{uploadCat}</strong>
+              → Uploading to <strong>{uploadCat}</strong>
               {resolvedUploadFolder && (
                 <>
-                  {" "}
-                  › folder <strong>{resolvedUploadFolder}</strong>
+                  {" "}› folder <strong>{resolvedUploadFolder}</strong>
                 </>
               )}
             </p>
@@ -696,8 +853,7 @@ export default function Admin({ user }) {
         {/* ── Gallery ── */}
         <div className="admin-gallery-section">
           <h2>
-            Gallery ({images.length} photo
-            {images.length !== 1 ? "s" : ""})
+            Gallery ({images.length} photo{images.length !== 1 ? "s" : ""})
           </h2>
 
           {/* Category filter tabs */}
@@ -718,6 +874,85 @@ export default function Admin({ user }) {
             ))}
           </div>
 
+          {/* Folder rename section — visible when a specific category is selected */}
+          {galleryFilter !== "All" &&
+            foldersByCat[galleryFilter]?.length > 0 && (
+              <div className="admin-folder-rename-section">
+                <p className="admin-folder-rename-header">
+                  <FolderPlus size={13} />
+                  Folders in {galleryFilter} — click pencil to rename
+                </p>
+                <div className="admin-folder-rename-list">
+                  {foldersByCat[galleryFilter].map((folder) => {
+                    const isRenamingThis =
+                      renamingFolder?.catName === galleryFilter &&
+                      renamingFolder?.oldName  === folder;
+                    const folderCount = images.filter(
+                      (img) =>
+                        img.category === galleryFilter && img.folder === folder
+                    ).length;
+
+                    return (
+                      <div key={folder} className="admin-folder-rename-row">
+                        {isRenamingThis ? (
+                          <>
+                            <input
+                              className="admin-folder-rename-input"
+                              value={renameFolderValue}
+                              autoFocus
+                              onChange={(e) => setRenameFolderValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter")
+                                  renameFolder(galleryFilter, folder, renameFolderValue);
+                                if (e.key === "Escape")
+                                  setRenamingFolder(null);
+                              }}
+                            />
+                            <button
+                              className="admin-icon-btn confirm"
+                              onClick={() =>
+                                renameFolder(galleryFilter, folder, renameFolderValue)
+                              }
+                            >
+                              <Check size={13} />
+                            </button>
+                            <button
+                              className="admin-icon-btn"
+                              onClick={() => setRenamingFolder(null)}
+                            >
+                              <X size={13} />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="admin-folder-rename-name">
+                              📁 {folder}
+                            </span>
+                            <span className="admin-folder-rename-count">
+                              {folderCount} photo{folderCount !== 1 ? "s" : ""}
+                            </span>
+                            <button
+                              className="admin-icon-btn"
+                              onClick={() => {
+                                setRenamingFolder({
+                                  catName: galleryFilter,
+                                  oldName: folder,
+                                });
+                                setRenameFolderValue(folder);
+                              }}
+                              title="Rename folder"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
           {filteredImages.length === 0 ? (
             <p className="admin-empty">
               {galleryFilter === "All"
@@ -735,6 +970,7 @@ export default function Admin({ user }) {
                   onDelete={deleteImage}
                   onCategoryChange={changeCat}
                   onFolderChange={changeFolder}
+                  onTitleChange={changeTitle}
                 />
               ))}
             </div>
