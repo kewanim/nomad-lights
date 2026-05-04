@@ -1,2 +1,76 @@
-import React,{useState}from"react";import{signInWithEmailAndPassword}from"firebase/auth";import{Camera}from"lucide-react";import{auth}from"../firebase/firebase";
-export default function Login(){const[email,setEmail]=useState("");const[password,setPassword]=useState("");const[status,setStatus]=useState("");async function submit(e){e.preventDefault();setStatus("Signing in...");try{await signInWithEmailAndPassword(auth,email,password);setStatus("")}catch{setStatus("Login failed. Check your email and password.")}}return <main className="login-page"><form className="login-card" onSubmit={submit}><Camera size={34}/><p className="eyebrow">Private Owner Area</p><h1>Nomad Lights Admin</h1><p>Only the owner can upload or remove images. Public visitors cannot edit the website.</p><label>Email<input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="you@example.com" required/></label><label>Password<input value={password} onChange={e=>setPassword(e.target.value)} type="password" placeholder="Your password" required/></label><button className="button primary full" type="submit">Login</button>{status&&<p className="status-message">{status}</p>}<a className="admin-link" href="#/">Back to public website</a></form></main>}
+import React, { useState } from "react";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { Camera } from "lucide-react";
+import { auth } from "../firebase/firebase";
+
+export default function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setLoading(true);
+    setStatus("");
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch {
+      setStatus("Incorrect email or password. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="login-page">
+      <form className="login-card" onSubmit={handleSubmit}>
+        <Camera size={28} strokeWidth={1.5} color="#1d1d1f" />
+        <p className="section-label" style={{ marginBottom: 4, marginTop: 16 }}>
+          Private Area
+        </p>
+        <h1>Nomad Lights Admin</h1>
+        <p>
+          Only the owner can upload or manage photos. Public visitors see the
+          portfolio only.
+        </p>
+
+        <div className="form-field">
+          <label htmlFor="login-email">Email</label>
+          <input
+            id="login-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            required
+            autoComplete="email"
+          />
+        </div>
+
+        <div className="form-field">
+          <label htmlFor="login-password">Password</label>
+          <input
+            id="login-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Your password"
+            required
+            autoComplete="current-password"
+          />
+        </div>
+
+        <button className="btn btn-primary btn-full" type="submit" disabled={loading}>
+          {loading ? "Signing in…" : "Sign in"}
+        </button>
+
+        {status && <p className="login-status">{status}</p>}
+
+        <a href="#/" className="back-link">
+          ← Back to website
+        </a>
+      </form>
+    </main>
+  );
+}
