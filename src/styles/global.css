@@ -1136,9 +1136,15 @@ button{ font: inherit; cursor: pointer; border: none; background: none; }
   object-position: center 25%;
   opacity: 0;
   transition: opacity 1.2s ease;
-  will-change: opacity;
+  will-change: transform, opacity;
 }
-.album-crossfade-img.active { opacity: 1; }
+.album-crossfade-img.active {
+  opacity: 1;
+}
+.album-crossfade-img.active:nth-child(4n+1) { animation: kb-zoom-in-center 5s ease both; }
+.album-crossfade-img.active:nth-child(4n+2) { animation: kb-zoom-in-left   5s ease both; }
+.album-crossfade-img.active:nth-child(4n+3) { animation: kb-zoom-in-right  5s ease both; }
+.album-crossfade-img.active:nth-child(4n+4) { animation: kb-zoom-out       5s ease both; }
 
 .folder-section  { padding: 20px 0 28px; }
 .folder-section-header {
