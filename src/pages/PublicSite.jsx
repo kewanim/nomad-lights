@@ -247,10 +247,17 @@ function AutoScrollCarousel({ images, loading, speed = 0.45 }) {
    Slower fade than the category cards (2s interval, 1.2s fade).
    ---------------------------------------------------------- */
 function AlbumCrossfade({ images }) {
-  const [idx, setIdx] = useState(0);
+  const [curr, setCurr] = useState(0);
+  const [prev, setPrev] = useState(null);
+
   useEffect(() => {
     if (images.length <= 1) return;
-    const t = setInterval(() => setIdx((i) => (i + 1) % images.length), 3800);
+    const t = setInterval(() => {
+      setCurr((c) => {
+        setPrev(c);
+        return (c + 1) % images.length;
+      });
+    }, 5500);
     return () => clearInterval(t);
   }, [images.length]);
 
@@ -261,8 +268,8 @@ function AlbumCrossfade({ images }) {
           key={img.id}
           src={img.imageUrl}
           alt={img.title || ""}
-          className={`album-crossfade-img${i === idx ? " active" : ""}`}
-          loading={i === 0 ? "eager" : "lazy"}
+          className={`album-crossfade-img${i === curr ? " active" : i === prev ? " prev" : ""}`}
+          loading="eager"
         />
       ))}
     </div>
