@@ -54,48 +54,20 @@ function useReveal(deps = []) {
 }
 
 /* ----------------------------------------------------------
-   CategoryCard
-   Outer carousel: fades between albums (slow, ~7s).
-   Inner carousel: crossfades photos within the active album (fast, ~2.5s).
+   CategoryCard — flat crossfade through all photos, slow + smooth
    ---------------------------------------------------------- */
 function CategoryCard({ category, images, loading }) {
-  // Group images into albums; no-album bucket comes first
-  const albums = useMemo(() => {
-    const map = {};
-    images.forEach((img) => {
-      const key = (img.folder || "").trim() || "__none__";
-      if (!map[key]) map[key] = [];
-      map[key].push(img);
-    });
-    return Object.entries(map)
-      .sort(([a], [b]) => {
-        if (a === "__none__") return -1;
-        if (b === "__none__") return 1;
-        return a.localeCompare(b);
-      })
-      .map(([key, photos]) => ({ key, name: key === "__none__" ? "" : key, photos }));
-  }, [images]);
+  const slides = images.length > 0
+    ? images
+    : [{ id: "fb", imageUrl: FALLBACK[category.name] || GENERIC_FALLBACK }];
 
-  const [albumIdx, setAlbumIdx] = useState(0);
-  const [photoIdx, setPhotoIdx] = useState(0);
+  const [idx, setIdx] = useState(0);
 
-  // Reset inner photo index whenever album changes
-  useEffect(() => { setPhotoIdx(0); }, [albumIdx]);
-
-  // Slow outer cycle — advance album every 7s
   useEffect(() => {
-    if (albums.length <= 1) return;
-    const t = setInterval(() => setAlbumIdx((i) => (i + 1) % albums.length), 7000);
+    if (slides.length <= 1) return;
+    const t = setInterval(() => setIdx((i) => (i + 1) % slides.length), 4000);
     return () => clearInterval(t);
-  }, [albums.length]);
-
-  // Fast inner cycle — advance photo every 2.5s, restarts when album changes
-  useEffect(() => {
-    const current = albums[albumIdx];
-    if (!current || current.photos.length <= 1) return;
-    const t = setInterval(() => setPhotoIdx((i) => (i + 1) % current.photos.length), 2500);
-    return () => clearInterval(t);
-  }, [albumIdx, albums]);
+  }, [slides.length]);
 
   const sectionId = `cat-${category.name.toLowerCase().replace(/\s+/g, "-")}`;
 
@@ -104,28 +76,15 @@ function CategoryCard({ category, images, loading }) {
       <div className="category-card-img-stack">
         {loading ? (
           <div className="skeleton" style={{ position: "absolute", inset: 0 }} />
-        ) : albums.length === 0 ? (
-          <img
-            src={FALLBACK[category.name] || GENERIC_FALLBACK}
-            alt={category.name}
-            className="category-card-img active"
-          />
         ) : (
-          albums.map((album, ai) => (
-            <div
-              key={album.key}
-              className={`cat-album-layer${ai === albumIdx ? " active" : ""}`}
-            >
-              {album.photos.map((img, pi) => (
-                <img
-                  key={img.id}
-                  src={img.imageUrl}
-                  alt={`${category.name}${album.name ? ` · ${album.name}` : ""}`}
-                  className={`category-card-img${pi === photoIdx ? " active" : ""}`}
-                  loading={ai === 0 && pi === 0 ? "eager" : "lazy"}
-                />
-              ))}
-            </div>
+          slides.map((img, i) => (
+            <img
+              key={img.id}
+              src={img.imageUrl}
+              alt={category.name}
+              className={`category-card-img${i === idx ? " active" : ""}`}
+              loading={i === 0 ? "eager" : "lazy"}
+            />
           ))
         )}
       </div>
@@ -138,6 +97,60 @@ function CategoryCard({ category, images, loading }) {
         )}
       </div>
     </a>
+  );
+}
+
+/* ----------------------------------------------------------
+   InfiniteCategoryRow — continuous RAF drift, no jumps.
+   Duplicates cards for seamless looping. Pauses on hover.
+   ---------------------------------------------------------- */
+function InfiniteCategoryRow({ categories, byCategory, loading }) {
+  const trackRef  = useRef(null);
+  const pausedRef = useRef(false);
+  const rafRef    = useRef(null);
+
+  const doubled = [...categories, ...categories];
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track || categories.length <= 1) return;
+
+    let pos = 0;
+    let halfWidth = 0;
+
+    function step() {
+      if (!halfWidth) halfWidth = track.scrollWidth / 2;
+      if (!pausedRef.current && halfWidth > 0) {
+        pos += 0.45;
+        if (pos >= halfWidth) pos -= halfWidth;
+        track.style.transform = `translateX(-${pos}px)`;
+      }
+      rafRef.current = requestAnimationFrame(step);
+    }
+
+    rafRef.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [categories.length]);
+
+  return (
+    <div
+      className="infinite-cards-outer"
+      onMouseEnter={() => { pausedRef.current = true; }}
+      onMouseLeave={() => { pausedRef.current = false; }}
+      onTouchStart={() => { pausedRef.current = true; }}
+      onTouchEnd={() => { setTimeout(() => { pausedRef.current = false; }, 1200); }}
+    >
+      <div className="infinite-cards-track" ref={trackRef}>
+        {doubled.map((cat, i) => (
+          <CategoryCard
+            key={`${cat.id}-${i}`}
+            category={cat}
+            images={byCategory[cat.name] || []}
+            loading={loading}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -466,36 +479,6 @@ export default function PublicSite() {
   // Scroll reveal — re-run when loading finishes and categories populate
   useReveal([loading, activeCategories.length]);
 
-  // Auto-scroll the category cards row — RAF-based for consistent smoothness
-  const cardsRowRef = useRef(null);
-  useEffect(() => {
-    const row = cardsRowRef.current;
-    if (!row || activeCategories.length <= 1) return;
-
-    function rafScrollTo(target, duration = 900) {
-      const start = row.scrollLeft;
-      const delta = target - start;
-      const startTime = performance.now();
-      function step(now) {
-        const elapsed = Math.min((now - startTime) / duration, 1);
-        // ease-in-out cubic
-        const t = elapsed < 0.5
-          ? 4 * elapsed ** 3
-          : 1 - (-2 * elapsed + 2) ** 3 / 2;
-        row.scrollLeft = start + delta * t;
-        if (elapsed < 1) requestAnimationFrame(step);
-      }
-      requestAnimationFrame(step);
-    }
-
-    const t = setInterval(() => {
-      const cardWidth = 254; // 240px + 14px gap
-      const maxScroll = row.scrollWidth - row.clientWidth;
-      const next = row.scrollLeft + cardWidth;
-      rafScrollTo(next >= maxScroll ? 0 : next);
-    }, 3800);
-    return () => clearInterval(t);
-  }, [activeCategories.length]);
 
   function closeMenu() { setMenuOpen(false); }
 
@@ -600,16 +583,11 @@ export default function PublicSite() {
               </h2>
             </div>
 
-            <div className="category-cards-row" ref={cardsRowRef}>
-              {activeCategories.map((cat) => (
-                <CategoryCard
-                  key={cat.id}
-                  category={cat}
-                  images={byCategory[cat.name] || []}
-                  loading={loading}
-                />
-              ))}
-            </div>
+            <InfiniteCategoryRow
+              categories={activeCategories}
+              byCategory={byCategory}
+              loading={loading}
+            />
           </section>
         )}
 

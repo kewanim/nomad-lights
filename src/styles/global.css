@@ -1193,17 +1193,7 @@ button{ font: inherit; cursor: pointer; border: none; background: none; }
   overflow: hidden;
   background: var(--light);
 }
-/* Outer album layer — slow fade between albums */
-.cat-album-layer {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transition: opacity 2.2s var(--ease-smooth);
-  will-change: opacity;
-}
-.cat-album-layer.active { opacity: 1; }
-
-/* Inner photo — fast crossfade within an album */
+/* Category card photo — flat crossfade, slow and smooth */
 .category-card-img {
   position: absolute;
   inset: 0;
@@ -1212,10 +1202,25 @@ button{ font: inherit; cursor: pointer; border: none; background: none; }
   object-fit: cover;
   object-position: center 25%;
   opacity: 0;
-  transition: opacity 1s var(--ease-smooth);
+  transition: opacity 1.8s ease-in-out;
   will-change: opacity;
 }
 .category-card-img.active { opacity: 1; }
+
+/* Infinite drift row */
+.infinite-cards-outer {
+  overflow: hidden;
+  padding-bottom: 12px;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+}
+.infinite-cards-track {
+  display: flex;
+  gap: 14px;
+  width: max-content;
+  padding-left: 24px;
+  will-change: transform;
+}
 
 /* ============================================================
    AUTO-SCROLL CAROUSEL  (cinematic ticker)
