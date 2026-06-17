@@ -471,6 +471,7 @@ export default function PublicSite() {
                       src={slide.imageUrl}
                       alt={`${slide.category}${slide.album ? ` — ${slide.album}` : ""}`}
                       className={`hero-carousel-img${i === heroIdx ? " active" : ""}`}
+                      data-kb={i % 4}
                       loading={i === 0 ? "eager" : "lazy"}
                     />
                   ))}
