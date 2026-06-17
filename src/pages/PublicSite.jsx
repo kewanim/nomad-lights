@@ -55,25 +55,47 @@ function useReveal(deps = []) {
 
 /* ----------------------------------------------------------
    CategoryCard
-   Cycles through ALL photos in that category with crossfade.
-   Before loading finishes: shows nothing (no placeholder flash).
+   Outer carousel: fades between albums (slow, ~7s).
+   Inner carousel: crossfades photos within the active album (fast, ~2.5s).
    ---------------------------------------------------------- */
 function CategoryCard({ category, images, loading }) {
-  const [activeIdx, setActiveIdx] = useState(0);
+  // Group images into albums; no-album bucket comes first
+  const albums = useMemo(() => {
+    const map = {};
+    images.forEach((img) => {
+      const key = (img.folder || "").trim() || "__none__";
+      if (!map[key]) map[key] = [];
+      map[key].push(img);
+    });
+    return Object.entries(map)
+      .sort(([a], [b]) => {
+        if (a === "__none__") return -1;
+        if (b === "__none__") return 1;
+        return a.localeCompare(b);
+      })
+      .map(([key, photos]) => ({ key, name: key === "__none__" ? "" : key, photos }));
+  }, [images]);
 
-  // Only use real images — no Unsplash fallback while loading
-  const slides = images.length > 0
-    ? images
-    : [{ id: "fb", imageUrl: FALLBACK[category.name] || GENERIC_FALLBACK }];
+  const [albumIdx, setAlbumIdx] = useState(0);
+  const [photoIdx, setPhotoIdx] = useState(0);
 
+  // Reset inner photo index whenever album changes
+  useEffect(() => { setPhotoIdx(0); }, [albumIdx]);
+
+  // Slow outer cycle — advance album every 7s
   useEffect(() => {
-    if (slides.length <= 1) return;
-    const t = setInterval(
-      () => setActiveIdx((i) => (i + 1) % slides.length),
-      2500
-    );
+    if (albums.length <= 1) return;
+    const t = setInterval(() => setAlbumIdx((i) => (i + 1) % albums.length), 7000);
     return () => clearInterval(t);
-  }, [slides.length]);
+  }, [albums.length]);
+
+  // Fast inner cycle — advance photo every 2.5s, restarts when album changes
+  useEffect(() => {
+    const current = albums[albumIdx];
+    if (!current || current.photos.length <= 1) return;
+    const t = setInterval(() => setPhotoIdx((i) => (i + 1) % current.photos.length), 2500);
+    return () => clearInterval(t);
+  }, [albumIdx, albums]);
 
   const sectionId = `cat-${category.name.toLowerCase().replace(/\s+/g, "-")}`;
 
@@ -81,17 +103,29 @@ function CategoryCard({ category, images, loading }) {
     <a href={`#${sectionId}`} className="category-card" aria-label={`View ${category.name} photos`}>
       <div className="category-card-img-stack">
         {loading ? (
-          /* Skeleton — no placeholder image flash */
           <div className="skeleton" style={{ position: "absolute", inset: 0 }} />
+        ) : albums.length === 0 ? (
+          <img
+            src={FALLBACK[category.name] || GENERIC_FALLBACK}
+            alt={category.name}
+            className="category-card-img active"
+          />
         ) : (
-          slides.map((img, i) => (
-            <img
-              key={img.id}
-              src={img.imageUrl}
-              alt={`${category.name} ${i + 1}`}
-              className={`category-card-img${i === activeIdx ? " active" : ""}`}
-              loading={i === 0 ? "eager" : "lazy"}
-            />
+          albums.map((album, ai) => (
+            <div
+              key={album.key}
+              className={`cat-album-layer${ai === albumIdx ? " active" : ""}`}
+            >
+              {album.photos.map((img, pi) => (
+                <img
+                  key={img.id}
+                  src={img.imageUrl}
+                  alt={`${category.name}${album.name ? ` · ${album.name}` : ""}`}
+                  className={`category-card-img${pi === photoIdx ? " active" : ""}`}
+                  loading={ai === 0 && pi === 0 ? "eager" : "lazy"}
+                />
+              ))}
+            </div>
           ))
         )}
       </div>
