@@ -480,10 +480,16 @@ export default function PublicSite() {
     return slides;
   }, [allImages, activeCategories]);
 
-  const [heroIdx, setHeroIdx] = useState(0);
+  const [heroIdx,  setHeroIdx]  = useState(0);
+  const [heroPrev, setHeroPrev] = useState(null);
   useEffect(() => {
     if (heroSlides.length <= 1) return;
-    const t = setInterval(() => setHeroIdx((i) => (i + 1) % heroSlides.length), 7000);
+    const t = setInterval(() => {
+      setHeroIdx((i) => {
+        setHeroPrev(i);
+        return (i + 1) % heroSlides.length;
+      });
+    }, 7000);
     return () => clearInterval(t);
   }, [heroSlides.length]);
 
@@ -563,8 +569,7 @@ export default function PublicSite() {
                       key={slide.id}
                       src={slide.imageUrl}
                       alt={`${slide.category}${slide.album ? ` — ${slide.album}` : ""}`}
-                      className={`hero-carousel-img${i === heroIdx ? " active" : ""}`}
-                      data-kb={i % 4}
+                      className={`hero-carousel-img${i === heroIdx ? " active" : i === heroPrev ? " prev" : ""}`}
                       loading={i === 0 ? "eager" : "lazy"}
                     />
                   ))}

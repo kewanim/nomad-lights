@@ -235,7 +235,7 @@ button{ font: inherit; cursor: pointer; border: none; background: none; }
   object-fit: cover;
 }
 
-/* Hero crossfade carousel */
+/* Hero crossfade carousel — transition-based Ken Burns (no snap on interrupt) */
 .hero-carousel-img {
   position: absolute;
   inset: 0;
@@ -244,35 +244,15 @@ button{ font: inherit; cursor: pointer; border: none; background: none; }
   object-fit: cover;
   object-position: center 30%;
   opacity: 0;
-  transition: opacity 2.5s ease;
+  z-index: 0;
+  transform: scale(1.0);
+  transition: opacity 2.5s ease-in-out, transform 10s var(--ease-smooth);
   will-change: transform, opacity;
 }
-.hero-carousel-img.active {
-  opacity: 1;
-}
-
-/* Ken Burns — 4 variants, each slightly different pan/zoom direction */
-@keyframes kb-zoom-in-center {
-  from { transform: scale(1.10) translate(0%,    2%); }
-  to   { transform: scale(1.00) translate(0%,    0%); }
-}
-@keyframes kb-zoom-in-left {
-  from { transform: scale(1.10) translate(2%,    1%); }
-  to   { transform: scale(1.00) translate(-1%,   0%); }
-}
-@keyframes kb-zoom-in-right {
-  from { transform: scale(1.10) translate(-2%,   1%); }
-  to   { transform: scale(1.00) translate(1%,    0%); }
-}
-@keyframes kb-zoom-out {
-  from { transform: scale(1.00) translate(0%,    0%); }
-  to   { transform: scale(1.08) translate(-1%,  -1%); }
-}
-
-.hero-carousel-img.active[data-kb="0"] { animation: kb-zoom-in-center 8s var(--ease-smooth) both; }
-.hero-carousel-img.active[data-kb="1"] { animation: kb-zoom-in-left   8s var(--ease-smooth) both; }
-.hero-carousel-img.active[data-kb="2"] { animation: kb-zoom-in-right  8s var(--ease-smooth) both; }
-.hero-carousel-img.active[data-kb="3"] { animation: kb-zoom-out       8s var(--ease-smooth) both; }
+/* Outgoing: keep same zoom target so transform never reverses — no snap */
+.hero-carousel-img.prev   { z-index: 1; opacity: 0; transform: scale(1.09); }
+/* Incoming: fade in and slowly zoom in */
+.hero-carousel-img.active { z-index: 2; opacity: 1; transform: scale(1.09); }
 
 /* Category / album label overlay */
 .hero-slide-label {
@@ -1139,11 +1119,14 @@ button{ font: inherit; cursor: pointer; border: none; background: none; }
   object-position: center 25%;
   opacity: 0;
   z-index: 0;
-  transition: opacity 2.4s ease-in-out;
+  transform: scale(1.0);
+  transition: opacity 2.4s ease-in-out, transform 9s ease-in-out;
   will-change: transform, opacity;
 }
-.album-crossfade-img.prev   { z-index: 1; opacity: 0; }
-.album-crossfade-img.active { z-index: 2; opacity: 1; }
+/* Outgoing: keep same transform target so transition never reverses — no snap */
+.album-crossfade-img.prev   { z-index: 1; opacity: 0; transform: scale(1.08); }
+/* Incoming: fade in and slowly zoom in */
+.album-crossfade-img.active { z-index: 2; opacity: 1; transform: scale(1.08); }
 
 .folder-section  { padding: 20px 0 28px; }
 .folder-section-header {
