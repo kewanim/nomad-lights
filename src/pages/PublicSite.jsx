@@ -221,6 +221,33 @@ function AutoScrollCarousel({ images, loading, speed = 0.45 }) {
 }
 
 /* ----------------------------------------------------------
+   AlbumCrossfade — crossfades through photos in one album.
+   Slower fade than the category cards (2s interval, 1.2s fade).
+   ---------------------------------------------------------- */
+function AlbumCrossfade({ images }) {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    if (images.length <= 1) return;
+    const t = setInterval(() => setIdx((i) => (i + 1) % images.length), 3800);
+    return () => clearInterval(t);
+  }, [images.length]);
+
+  return (
+    <div className="album-crossfade">
+      {images.map((img, i) => (
+        <img
+          key={img.id}
+          src={img.imageUrl}
+          alt={img.title || ""}
+          className={`album-crossfade-img${i === idx ? " active" : ""}`}
+          loading={i === 0 ? "eager" : "lazy"}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------
    FolderSection — a named sub-section within a category
    ---------------------------------------------------------- */
 function FolderSection({ folderName, images, description }) {
@@ -239,7 +266,7 @@ function FolderSection({ folderName, images, description }) {
           </span>
         </div>
       </div>
-      <AutoScrollCarousel images={images} loading={false} />
+      <AlbumCrossfade images={images} />
     </div>
   );
 }
@@ -311,7 +338,9 @@ function CategorySection({ category, images, loading }) {
           )}
         </div>
       ) : (
-        <AutoScrollCarousel images={displayImages} loading={loading} />
+        <div className="container">
+          <AlbumCrossfade images={displayImages} />
+        </div>
       )}
     </section>
   );
@@ -437,6 +466,20 @@ export default function PublicSite() {
   // Scroll reveal — re-run when loading finishes and categories populate
   useReveal([loading, activeCategories.length]);
 
+  // Auto-scroll the category cards row
+  const cardsRowRef = useRef(null);
+  useEffect(() => {
+    const row = cardsRowRef.current;
+    if (!row || activeCategories.length <= 1) return;
+    const t = setInterval(() => {
+      const cardWidth = 254; // 240px card + 14px gap
+      const maxScroll = row.scrollWidth - row.clientWidth;
+      const next = row.scrollLeft + cardWidth;
+      row.scrollTo({ left: next >= maxScroll ? 0 : next, behavior: "smooth" });
+    }, 3500);
+    return () => clearInterval(t);
+  }, [activeCategories.length]);
+
   function closeMenu() { setMenuOpen(false); }
 
   return (
@@ -540,7 +583,7 @@ export default function PublicSite() {
               </h2>
             </div>
 
-            <div className="category-cards-row">
+            <div className="category-cards-row" ref={cardsRowRef}>
               {activeCategories.map((cat) => (
                 <CategoryCard
                   key={cat.id}
