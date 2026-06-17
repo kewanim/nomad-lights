@@ -345,20 +345,22 @@ export default function Admin({ user }) {
 
   const categoryNames = displayCategories.map((c) => c.name);
 
+  // Build folder list directly from images — keyed by whatever category
+  // the images actually have, so it's never blocked by categoryNames loading order.
   const foldersByCat = useMemo(() => {
     const map = {};
-    categoryNames.forEach((cat) => {
-      map[cat] = [
-        ...new Set(
-          images
-            .filter((img) => img.category === cat)
-            .map((img) => img.folder || "")
-            .filter(Boolean)
-        ),
-      ].sort();
+    images.forEach((img) => {
+      const folder = (img.folder || "").trim();
+      if (!folder) return;
+      if (!map[img.category]) map[img.category] = new Set();
+      map[img.category].add(folder);
     });
-    return map;
-  }, [categoryNames, images]);
+    const result = {};
+    Object.entries(map).forEach(([cat, set]) => {
+      result[cat] = [...set].sort();
+    });
+    return result;
+  }, [images]);
 
   const countByCat = useMemo(() => {
     const map = { All: images.length };
