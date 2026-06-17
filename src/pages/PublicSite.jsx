@@ -466,17 +466,34 @@ export default function PublicSite() {
   // Scroll reveal — re-run when loading finishes and categories populate
   useReveal([loading, activeCategories.length]);
 
-  // Auto-scroll the category cards row
+  // Auto-scroll the category cards row — RAF-based for consistent smoothness
   const cardsRowRef = useRef(null);
   useEffect(() => {
     const row = cardsRowRef.current;
     if (!row || activeCategories.length <= 1) return;
+
+    function rafScrollTo(target, duration = 900) {
+      const start = row.scrollLeft;
+      const delta = target - start;
+      const startTime = performance.now();
+      function step(now) {
+        const elapsed = Math.min((now - startTime) / duration, 1);
+        // ease-in-out cubic
+        const t = elapsed < 0.5
+          ? 4 * elapsed ** 3
+          : 1 - (-2 * elapsed + 2) ** 3 / 2;
+        row.scrollLeft = start + delta * t;
+        if (elapsed < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
     const t = setInterval(() => {
-      const cardWidth = 254; // 240px card + 14px gap
+      const cardWidth = 254; // 240px + 14px gap
       const maxScroll = row.scrollWidth - row.clientWidth;
       const next = row.scrollLeft + cardWidth;
-      row.scrollTo({ left: next >= maxScroll ? 0 : next, behavior: "smooth" });
-    }, 3500);
+      rafScrollTo(next >= maxScroll ? 0 : next);
+    }, 3800);
     return () => clearInterval(t);
   }, [activeCategories.length]);
 
