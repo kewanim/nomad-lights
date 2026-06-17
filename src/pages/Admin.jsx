@@ -44,7 +44,7 @@ const DEFAULT_CATEGORIES = [
 /* ----------------------------------------------------------
    Compress image before upload
    ---------------------------------------------------------- */
-async function compressImage(file, maxPx = 1920, quality = 0.82) {
+async function compressImage(file, maxPx = 2560, quality = 0.93) {
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);

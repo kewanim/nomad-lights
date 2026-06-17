@@ -391,7 +391,7 @@ export default function PublicSite() {
   const [heroIdx, setHeroIdx] = useState(0);
   useEffect(() => {
     if (heroSlides.length <= 1) return;
-    const t = setInterval(() => setHeroIdx((i) => (i + 1) % heroSlides.length), 4500);
+    const t = setInterval(() => setHeroIdx((i) => (i + 1) % heroSlides.length), 7000);
     return () => clearInterval(t);
   }, [heroSlides.length]);
 
