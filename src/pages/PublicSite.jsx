@@ -54,18 +54,27 @@ function useReveal(deps = []) {
 }
 
 /* ----------------------------------------------------------
-   CategoryCard — flat crossfade through all photos, slow + smooth
+   CategoryCard — smooth crossfade using prev/curr tracking.
+   Active image always sits above the outgoing one via z-index,
+   so the fade is clean regardless of array order.
+   All images load eagerly to prevent blank-frame flash.
    ---------------------------------------------------------- */
 function CategoryCard({ category, images, loading }) {
   const slides = images.length > 0
     ? images
     : [{ id: "fb", imageUrl: FALLBACK[category.name] || GENERIC_FALLBACK }];
 
-  const [idx, setIdx] = useState(0);
+  const [curr, setCurr] = useState(0);
+  const [prev, setPrev] = useState(null);
 
   useEffect(() => {
     if (slides.length <= 1) return;
-    const t = setInterval(() => setIdx((i) => (i + 1) % slides.length), 4000);
+    const t = setInterval(() => {
+      setCurr((c) => {
+        setPrev(c);
+        return (c + 1) % slides.length;
+      });
+    }, 5500);
     return () => clearInterval(t);
   }, [slides.length]);
 
@@ -82,8 +91,8 @@ function CategoryCard({ category, images, loading }) {
               key={img.id}
               src={img.imageUrl}
               alt={category.name}
-              className={`category-card-img${i === idx ? " active" : ""}`}
-              loading={i === 0 ? "eager" : "lazy"}
+              className={`category-card-img${i === curr ? " active" : i === prev ? " prev" : ""}`}
+              loading="eager"
             />
           ))
         )}
