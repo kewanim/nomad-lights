@@ -189,12 +189,17 @@ function AutoScrollCarousel({ images, loading, speed = 0.45 }) {
 /* ----------------------------------------------------------
    FolderSection — a named sub-section within a category
    ---------------------------------------------------------- */
-function FolderSection({ folderName, images }) {
+function FolderSection({ folderName, images, description }) {
   return (
     <div className="folder-section">
       <div className="container">
         <div className="folder-section-header">
-          <span className="folder-section-title">{folderName}</span>
+          <div>
+            <span className="folder-section-title">{folderName}</span>
+            {description && (
+              <p className="folder-section-description">{description}</p>
+            )}
+          </div>
           <span className="folder-section-count">
             {images.length} {images.length === 1 ? "photo" : "photos"}
           </span>
@@ -250,6 +255,9 @@ function CategorySection({ category, images, loading }) {
           <div>
             <p className="portfolio-cat-label">Session type</p>
             <h2 className="portfolio-cat-title">{category.name}</h2>
+            {category.description && (
+              <p className="portfolio-cat-description">{category.description}</p>
+            )}
           </div>
         </div>
       </div>
@@ -257,7 +265,12 @@ function CategorySection({ category, images, loading }) {
       {hasFolders ? (
         <div className="folder-sections">
           {folderGroups.map((fg) => (
-            <FolderSection key={fg.name} folderName={fg.name} images={fg.images} />
+            <FolderSection
+              key={fg.name}
+              folderName={fg.name}
+              images={fg.images}
+              description={category.folderDescriptions?.[fg.name]}
+            />
           ))}
           {unfiledImages.length > 0 && (
             <FolderSection folderName="General" images={unfiledImages} />
@@ -276,6 +289,7 @@ function CategorySection({ category, images, loading }) {
 export default function PublicSite() {
   const [categories, setCategories] = useState([]);
   const [allImages, setAllImages]   = useState([]);
+  const [reviews,   setReviews]     = useState([]);
   const [loading, setLoading]       = useState(true);
   const [menuOpen, setMenuOpen]     = useState(false);
 
@@ -296,6 +310,13 @@ export default function PublicSite() {
       },
       () => setLoading(false)
     );
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, "reviews"), orderBy("createdAt", "desc"));
+    return onSnapshot(q, (snap) => {
+      setReviews(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, () => {});
   }, []);
 
   const activeCategories = useMemo(() => {
@@ -494,6 +515,34 @@ export default function PublicSite() {
             </div>
           </div>
         </section>
+
+        {/* ── Testimonials ── */}
+        {reviews.length > 0 && (
+          <section className="testimonials-section">
+            <div className="container">
+              <p className="section-label" data-reveal>What clients say</p>
+              <h2 className="section-title" data-reveal data-delay="1">
+                Real experiences,<br /><span>honest words.</span>
+              </h2>
+              <div className="testimonials-grid">
+                {reviews.map((r, i) => (
+                  <article
+                    key={r.id}
+                    className="testimonial-card"
+                    data-reveal
+                    data-delay={String((i % 3) + 1)}
+                  >
+                    <div className="testimonial-stars">
+                      {"★".repeat(r.rating || 5)}{"☆".repeat(5 - (r.rating || 5))}
+                    </div>
+                    <p className="testimonial-text">"{r.text}"</p>
+                    <p className="testimonial-name">— {r.name}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* ── Contact ── */}
         <section id="contact" className="contact-section">

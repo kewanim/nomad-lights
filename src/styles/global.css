@@ -1505,3 +1505,277 @@ button{ font: inherit; cursor: pointer; border: none; background: none; }
    ============================================================ */
 .portfolio-section { scroll-margin-top: 60px; }
 
+/* ============================================================
+   PUBLIC SITE — category & folder descriptions
+   ============================================================ */
+.portfolio-cat-description {
+  font-size: 1rem;
+  color: var(--gray);
+  margin-top: 8px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  max-width: 480px;
+  line-height: 1.55;
+}
+.folder-section-description {
+  font-size: 0.88rem;
+  color: var(--gray);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   PUBLIC SITE — testimonials section
+   ============================================================ */
+.testimonials-section {
+  padding: 88px 0;
+  background: var(--light);
+  border-top: 1px solid var(--border);
+}
+.testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 0;
+}
+.testimonial-card {
+  background: var(--white);
+  border-radius: var(--radius-md);
+  padding: 28px 24px;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: box-shadow 0.25s var(--ease), transform 0.25s var(--ease);
+}
+.testimonial-card:hover { box-shadow: var(--shadow-sm); transform: translateY(-2px); }
+.testimonial-stars {
+  font-size: 1.1rem;
+  color: #f5a623;
+  letter-spacing: 1px;
+}
+.testimonial-text {
+  font-size: 0.95rem;
+  color: var(--black);
+  line-height: 1.7;
+  font-style: italic;
+  flex: 1;
+}
+.testimonial-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--gray);
+  letter-spacing: 0.02em;
+}
+
+/* ============================================================
+   ADMIN — upload steps (new cleaner flow)
+   ============================================================ */
+.upload-step {
+  margin-bottom: 20px;
+}
+.upload-step-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--black);
+  margin-bottom: 10px;
+}
+.upload-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--black);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.upload-step-optional {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--gray);
+  margin-left: 2px;
+}
+
+/* Category chip buttons in upload form */
+.admin-upload-cat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.admin-cat-chip {
+  padding: 7px 16px;
+  border-radius: 980px;
+  font-size: 0.84rem;
+  font-weight: 500;
+  background: var(--light);
+  color: var(--gray);
+  border: 1.5px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease), transform 0.12s;
+  font-family: var(--font);
+}
+.admin-cat-chip:hover { background: var(--border); color: var(--black); transform: scale(1.03); }
+.admin-cat-chip.selected {
+  background: var(--black);
+  color: var(--white);
+  border-color: var(--black);
+}
+.admin-cat-chip.new-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-style: dashed;
+  color: var(--blue);
+  border-color: rgba(0,113,227,0.35);
+  background: rgba(0,113,227,0.04);
+}
+.admin-cat-chip.new-chip:hover { background: rgba(0,113,227,0.1); border-color: var(--blue); }
+
+/* ============================================================
+   ADMIN — category description inline editing
+   ============================================================ */
+.admin-cat-desc-btn {
+  font-size: 0.75rem;
+  color: var(--gray);
+  margin-top: 5px;
+  display: block;
+  text-align: left;
+  font-style: italic;
+  cursor: pointer;
+  transition: color 0.15s;
+  font-family: var(--font);
+  padding: 2px 0;
+}
+.admin-cat-desc-btn:hover { color: var(--black); }
+.admin-cat-desc-edit {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+}
+.admin-cat-desc-edit input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1.5px solid var(--blue);
+  border-radius: var(--radius-sm);
+  font-size: 0.83rem;
+  background: var(--white);
+  color: var(--black);
+  outline: none;
+  font-family: var(--font);
+  box-shadow: 0 0 0 3px rgba(0,113,227,0.10);
+}
+.admin-folder-rename-row-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================
+   ADMIN — reviews panel
+   ============================================================ */
+.admin-reviews-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.admin-reviews-header h2 { margin-bottom: 4px; }
+.admin-reviews-header p  { font-size: 0.86rem; color: var(--gray); line-height: 1.55; }
+.admin-reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 20px 0;
+}
+.admin-review-row {
+  position: relative;
+  padding: 14px 16px;
+  background: var(--light);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.admin-review-stars {
+  font-size: 0.95rem;
+  color: #f5a623;
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+}
+.admin-review-text {
+  font-size: 0.87rem;
+  color: var(--black);
+  line-height: 1.65;
+  font-style: italic;
+  margin-bottom: 6px;
+}
+.admin-review-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--gray);
+}
+.admin-review-delete {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: var(--gray);
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.15s, color 0.15s;
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+}
+.admin-review-delete:hover { opacity: 1; color: var(--red); }
+.admin-add-review-form {
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+.admin-review-textarea {
+  width: 100%;
+  padding: 10px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  font-family: var(--font);
+  color: var(--black);
+  background: var(--light);
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  line-height: 1.6;
+}
+.admin-review-textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(0,113,227,0.11);
+  background: var(--white);
+}
+
+/* Star picker */
+.star-picker {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+.star-btn {
+  font-size: 1.4rem;
+  color: var(--border);
+  cursor: pointer;
+  transition: color 0.1s, transform 0.1s;
+  line-height: 1;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+}
+.star-btn.filled { color: #f5a623; }
+.star-btn:hover  { transform: scale(1.2); }
+

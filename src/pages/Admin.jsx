@@ -25,7 +25,7 @@ import {
   Edit2,
   Eye,
   EyeOff,
-  FolderPlus,
+  MessageSquare,
   Plus,
   Trash2,
   UploadCloud,
@@ -33,9 +33,6 @@ import {
 } from "lucide-react";
 import { auth, db, storage } from "../firebase/firebase";
 
-/* ----------------------------------------------------------
-   Default categories — seeded into Firestore on first load
-   ---------------------------------------------------------- */
 const DEFAULT_CATEGORIES = [
   "Portraits",
   "Couples",
@@ -45,7 +42,7 @@ const DEFAULT_CATEGORIES = [
 ];
 
 /* ----------------------------------------------------------
-   Compress image before upload (saves free storage quota)
+   Compress image before upload
    ---------------------------------------------------------- */
 async function compressImage(file, maxPx = 1920, quality = 0.82) {
   return new Promise((resolve) => {
@@ -78,12 +75,32 @@ async function compressImage(file, maxPx = 1920, quality = 0.82) {
         quality
       );
     };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      resolve(file);
-    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
     img.src = url;
   });
+}
+
+/* ----------------------------------------------------------
+   Star picker for reviews
+   ---------------------------------------------------------- */
+function StarPicker({ value, onChange }) {
+  const [hovered, setHovered] = useState(0);
+  return (
+    <div className="star-picker">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          className={`star-btn${n <= (hovered || value) ? " filled" : ""}`}
+          onMouseEnter={() => setHovered(n)}
+          onMouseLeave={() => setHovered(0)}
+          onClick={() => onChange(n)}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  );
 }
 
 /* ----------------------------------------------------------
@@ -132,14 +149,8 @@ function AdminImageCard({
 
   return (
     <div className={`admin-image-card${expanded ? " expanded" : ""}`}>
-
-      {/* ── Image + hover overlay ── */}
       <div className="admin-image-card-img-wrap">
-        <img
-          src={image.imageUrl}
-          alt={displayTitle}
-          loading="lazy"
-        />
+        <img src={image.imageUrl} alt={displayTitle} loading="lazy" />
         <div className="admin-image-card-overlay">
           <button
             className="admin-img-overlay-btn edit"
@@ -158,7 +169,6 @@ function AdminImageCard({
         </div>
       </div>
 
-      {/* ── Compact info strip ── */}
       <div className="admin-image-card-compact">
         <p className="admin-image-card-title-text">{displayTitle}</p>
         <div className="admin-image-card-chips">
@@ -169,31 +179,23 @@ function AdminImageCard({
         </div>
       </div>
 
-      {/* ── Expandable edit panel ── */}
       {expanded && (
         <div className="admin-image-card-panel">
-
-          {/* Title */}
           <div className="admin-panel-field">
-            <label>Title</label>
+            <label>Caption</label>
             <div className="admin-panel-input-row">
               <input
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && saveTitle()}
-                placeholder="Photo title…"
+                placeholder="Photo caption…"
               />
-              <button
-                className="admin-icon-btn confirm"
-                onClick={saveTitle}
-                title="Save title"
-              >
+              <button className="admin-icon-btn confirm" onClick={saveTitle} title="Save">
                 <Check size={13} />
               </button>
             </div>
           </div>
 
-          {/* Category */}
           <div className="admin-panel-field">
             <label>Category</label>
             <select
@@ -201,66 +203,39 @@ function AdminImageCard({
               onChange={(e) => onCategoryChange(image, e.target.value)}
             >
               {allCategories.map((c) => (
-                <option key={c.id} value={c.name}>
-                  {c.name}
-                </option>
+                <option key={c.id} value={c.name}>{c.name}</option>
               ))}
             </select>
           </div>
 
-          {/* Folder */}
           <div className="admin-panel-field">
-            <label>Folder</label>
+            <label>Album</label>
             {creatingFolder ? (
               <div className="admin-folder-input-row">
                 <input
                   className="admin-folder-input"
                   value={newFolderName}
                   onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder="New folder name"
+                  placeholder="New album name"
                   autoFocus
-                  onKeyDown={(e) =>
-                    e.key === "Enter" && confirmNewFolder()
-                  }
+                  onKeyDown={(e) => e.key === "Enter" && confirmNewFolder()}
                 />
-                <button
-                  className="admin-folder-save-btn"
-                  onClick={confirmNewFolder}
-                >
-                  Save
-                </button>
-                <button
-                  className="admin-folder-cancel-btn"
-                  onClick={() => {
-                    setCreatingFolder(false);
-                    setNewFolderName("");
-                  }}
-                >
-                  ✕
-                </button>
+                <button className="admin-folder-save-btn" onClick={confirmNewFolder}>Save</button>
+                <button className="admin-folder-cancel-btn" onClick={() => { setCreatingFolder(false); setNewFolderName(""); }}>✕</button>
               </div>
             ) : (
-              <select
-                value={image.folder || ""}
-                onChange={handleFolderSelect}
-              >
-                <option value="">No folder</option>
+              <select value={image.folder || ""} onChange={handleFolderSelect}>
+                <option value="">No album</option>
                 {foldersForCat.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
+                  <option key={f} value={f}>{f}</option>
                 ))}
-                <option value="__new__">+ Create new folder…</option>
+                <option value="__new__">+ Create new album…</option>
               </select>
             )}
           </div>
 
-          <button
-            className="admin-panel-close"
-            onClick={() => setExpanded(false)}
-          >
-            <X size={12} />
-            Done editing
+          <button className="admin-panel-close" onClick={() => setExpanded(false)}>
+            <X size={12} /> Done editing
           </button>
         </div>
       )}
@@ -272,36 +247,49 @@ function AdminImageCard({
    Main Admin page
    ---------------------------------------------------------- */
 export default function Admin({ user }) {
-  // ── Firestore state ─────────────────────────────────────
+  // ── Firestore state ──────────────────────────────────────
   const [categories, setCategories] = useState([]);
   const [images,     setImages]     = useState([]);
+  const [reviews,    setReviews]    = useState([]);
 
-  // ── Upload form state ────────────────────────────────────
-  const [uploadCat,              setUploadCat]              = useState("");
-  const [uploadFolder,           setUploadFolder]           = useState("");
-  const [creatingUploadFolder,   setCreatingUploadFolder]   = useState(false);
-  const [newUploadFolder,        setNewUploadFolder]        = useState("");
-  const [title,                  setTitle]                  = useState("");
-  const [status,                 setStatus]                 = useState("");
-  const [uploading,              setUploading]              = useState(false);
-  const [dragOver,               setDragOver]               = useState(false);
+  // ── Upload state ─────────────────────────────────────────
+  const [uploadCat,            setUploadCat]            = useState("");
+  const [uploadFolder,         setUploadFolder]         = useState("");
+  const [creatingUploadFolder, setCreatingUploadFolder] = useState(false);
+  const [newUploadFolder,      setNewUploadFolder]      = useState("");
+  const [caption,              setCaption]              = useState("");
+  const [status,               setStatus]               = useState("");
+  const [uploading,            setUploading]            = useState(false);
+  const [dragOver,             setDragOver]             = useState(false);
+
+  // ── New category inline (from upload form) ───────────────
+  const [creatingCatInline, setCreatingCatInline] = useState(false);
+  const [newCatInline,      setNewCatInline]      = useState("");
 
   // ── Gallery filter ───────────────────────────────────────
   const [galleryFilter, setGalleryFilter] = useState("All");
 
-  // ── New category form ────────────────────────────────────
-  const [newCatName,  setNewCatName]  = useState("");
-  const [savingCat,   setSavingCat]   = useState(false);
-
-  // ── Rename category ──────────────────────────────────────
+  // ── Category management ──────────────────────────────────
+  const [newCatName,       setNewCatName]       = useState("");
+  const [savingCat,        setSavingCat]        = useState(false);
   const [renamingCatId,    setRenamingCatId]    = useState(null);
   const [renameCatValue,   setRenameCatValue]   = useState("");
+  const [editingDescCatId, setEditingDescCatId] = useState(null);
+  const [descValue,        setDescValue]        = useState("");
 
-  // ── Rename folder ────────────────────────────────────────
-  const [renamingFolder,       setRenamingFolder]       = useState(null);
-  const [renameFolderValue,    setRenameFolderValue]    = useState("");
+  // ── Folder management ────────────────────────────────────
+  const [renamingFolder,    setRenamingFolder]    = useState(null);
+  const [renameFolderValue, setRenameFolderValue] = useState("");
+  const [editingFolderDesc, setEditingFolderDesc] = useState(null);
+  const [folderDescValue,   setFolderDescValue]   = useState("");
 
-  /* ── Seed default categories on first admin load ─────── */
+  // ── Reviews form ─────────────────────────────────────────
+  const [newReviewName,   setNewReviewName]   = useState("");
+  const [newReviewText,   setNewReviewText]   = useState("");
+  const [newReviewRating, setNewReviewRating] = useState(5);
+  const [addingReview,    setAddingReview]    = useState(false);
+
+  /* ── Seed default categories on first load ─────────────── */
   useEffect(() => {
     async function seedIfEmpty() {
       try {
@@ -323,7 +311,7 @@ export default function Admin({ user }) {
     seedIfEmpty();
   }, []);
 
-  /* ── Listen: categories ──────────────────────────────── */
+  /* ── Listen: categories ────────────────────────────────── */
   useEffect(() => {
     const q = query(collection(db, "categories"), orderBy("order", "asc"));
     return onSnapshot(q, (snap) => {
@@ -333,7 +321,7 @@ export default function Admin({ user }) {
     });
   }, []);
 
-  /* ── Listen: images ──────────────────────────────────── */
+  /* ── Listen: images ────────────────────────────────────── */
   useEffect(() => {
     const q = query(collection(db, "gallery"), orderBy("createdAt", "desc"));
     return onSnapshot(q, (snap) => {
@@ -341,10 +329,21 @@ export default function Admin({ user }) {
     });
   }, []);
 
-  /* ── Derived ─────────────────────────────────────────── */
-  const categoryNames = categories.length > 0
-    ? categories.map((c) => c.name)
-    : DEFAULT_CATEGORIES;
+  /* ── Listen: reviews ───────────────────────────────────── */
+  useEffect(() => {
+    const q = query(collection(db, "reviews"), orderBy("createdAt", "desc"));
+    return onSnapshot(q, (snap) => {
+      setReviews(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+  }, []);
+
+  /* ── Derived ───────────────────────────────────────────── */
+  // Always have selectable categories — falls back to defaults while Firestore loads
+  const displayCategories = categories.length > 0
+    ? categories
+    : DEFAULT_CATEGORIES.map((n, i) => ({ id: n, name: n, visible: true, order: i }));
+
+  const categoryNames = displayCategories.map((c) => c.name);
 
   const foldersByCat = useMemo(() => {
     const map = {};
@@ -375,18 +374,14 @@ export default function Admin({ user }) {
       : images.filter((img) => img.category === galleryFilter);
   }, [images, galleryFilter]);
 
-  /* ── Upload ──────────────────────────────────────────── */
+  const currentFolders       = foldersByCat[uploadCat] || [];
+  const resolvedUploadFolder = creatingUploadFolder ? newUploadFolder : uploadFolder;
+
+  /* ── Upload ────────────────────────────────────────────── */
   async function uploadFiles(files) {
-    const selected = Array.from(files || []).filter((f) =>
-      f.type.startsWith("image/")
-    );
-    if (!selected.length) {
-      setStatus("Please choose image files only.");
-      return;
-    }
-    const folderToUse = creatingUploadFolder
-      ? newUploadFolder.trim()
-      : uploadFolder;
+    const selected = Array.from(files || []).filter((f) => f.type.startsWith("image/"));
+    if (!selected.length) { setStatus("Please choose image files only."); return; }
+    const folderToUse = creatingUploadFolder ? newUploadFolder.trim() : uploadFolder;
     setUploading(true);
     for (const file of selected) {
       try {
@@ -395,17 +390,15 @@ export default function Admin({ user }) {
         const origMB = (file.size / 1024 / 1024).toFixed(1);
         const compMB = (compressed.size / 1024 / 1024).toFixed(1);
         setStatus(`Uploading ${file.name} (${origMB} MB → ${compMB} MB)…`);
-        const safeName  = compressed.name.replace(/[^a-z0-9.-]/gi, "-").toLowerCase();
-        const filePath  = `gallery/${Date.now()}-${safeName}`;
-        const storRef   = ref(storage, filePath);
+        const safeName   = compressed.name.replace(/[^a-z0-9.-]/gi, "-").toLowerCase();
+        const filePath   = `gallery/${Date.now()}-${safeName}`;
+        const storRef    = ref(storage, filePath);
         const uploadTask = uploadBytesResumable(storRef, compressed);
         await new Promise((resolve, reject) => {
           uploadTask.on(
             "state_changed",
             (snap) => {
-              const pct = Math.round(
-                (snap.bytesTransferred / snap.totalBytes) * 100
-              );
+              const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
               setStatus(`Uploading ${file.name} — ${pct}%`);
             },
             reject,
@@ -414,7 +407,7 @@ export default function Admin({ user }) {
         });
         const imageUrl = await getDownloadURL(storRef);
         await addDoc(collection(db, "gallery"), {
-          title:       title || uploadCat,
+          title:       caption || uploadCat,
           category:    uploadCat,
           folder:      folderToUse || "",
           imageUrl,
@@ -427,106 +420,65 @@ export default function Admin({ user }) {
         setStatus(`Upload failed for ${file.name}. Please try again.`);
       }
     }
-    setTitle("");
+    setCaption("");
     setCreatingUploadFolder(false);
     setNewUploadFolder("");
     setUploading(false);
   }
 
-  /* ── Delete image ────────────────────────────────────── */
+  /* ── Delete image ──────────────────────────────────────── */
   async function deleteImage(image) {
     if (!window.confirm("Delete this image from the website?")) return;
     try {
       await deleteDoc(doc(db, "gallery", image.id));
-      if (image.storagePath) {
-        await deleteObject(ref(storage, image.storagePath));
-      }
-    } catch {
-      alert("Could not delete. Please try again.");
-    }
+      if (image.storagePath) await deleteObject(ref(storage, image.storagePath));
+    } catch { alert("Could not delete. Please try again."); }
   }
 
-  /* ── Change category (clears folder) ────────────────── */
+  /* ── Change category / folder / title ─────────────────── */
   async function changeCat(image, newCat) {
-    try {
-      await updateDoc(doc(db, "gallery", image.id), {
-        category: newCat,
-        folder:   "",
-      });
-    } catch {
-      alert("Could not update category.");
-    }
+    try { await updateDoc(doc(db, "gallery", image.id), { category: newCat, folder: "" }); }
+    catch { alert("Could not update category."); }
   }
 
-  /* ── Change folder ───────────────────────────────────── */
   async function changeFolder(image, newFolder) {
-    try {
-      await updateDoc(doc(db, "gallery", image.id), { folder: newFolder });
-    } catch {
-      alert("Could not update folder.");
-    }
+    try { await updateDoc(doc(db, "gallery", image.id), { folder: newFolder }); }
+    catch { alert("Could not update album."); }
   }
 
-  /* ── Change photo title ──────────────────────────────── */
   async function changeTitle(image, newTitle) {
-    try {
-      await updateDoc(doc(db, "gallery", image.id), {
-        title: newTitle || image.category,
-      });
-    } catch {
-      alert("Could not update title.");
-    }
+    try { await updateDoc(doc(db, "gallery", image.id), { title: newTitle || image.category }); }
+    catch { alert("Could not update caption."); }
   }
 
-  /* ── Toggle category visibility ─────────────────────── */
+  /* ── Category visibility / add / rename ───────────────── */
   async function toggleVisibility(cat) {
-    try {
-      await updateDoc(doc(db, "categories", cat.id), {
-        visible: !cat.visible,
-      });
-    } catch {
-      alert("Could not update visibility.");
-    }
+    try { await updateDoc(doc(db, "categories", cat.id), { visible: !cat.visible }); }
+    catch { alert("Could not update visibility."); }
   }
 
-  /* ── Add new category ────────────────────────────────── */
-  async function addCategory() {
-    const name = newCatName.trim();
-    if (!name) return;
-    if (categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
-      alert("A category with that name already exists.");
-      return;
+  async function addCategory(name) {
+    const n = (name || newCatName).trim();
+    if (!n) return;
+    if (categories.some((c) => c.name.toLowerCase() === n.toLowerCase())) {
+      alert("A category with that name already exists."); return;
     }
     try {
       setSavingCat(true);
       await addDoc(collection(db, "categories"), {
-        name,
-        visible:   false,
-        order:     categories.length,
-        createdAt: serverTimestamp(),
+        name: n, visible: false, order: categories.length, createdAt: serverTimestamp(),
       });
-      setNewCatName("");
-    } catch {
-      alert("Could not add category.");
-    } finally {
-      setSavingCat(false);
-    }
+      if (!name) setNewCatName("");
+      return n;
+    } catch { alert("Could not add category."); }
+    finally { setSavingCat(false); }
   }
 
-  /* ── Rename category (batch: doc + all images) ───────── */
   async function renameCategory(cat, newName) {
     newName = newName.trim();
-    if (!newName || newName === cat.name) {
-      setRenamingCatId(null);
-      return;
-    }
-    if (
-      categories.some(
-        (c) => c.id !== cat.id && c.name.toLowerCase() === newName.toLowerCase()
-      )
-    ) {
-      alert("A category with that name already exists.");
-      return;
+    if (!newName || newName === cat.name) { setRenamingCatId(null); return; }
+    if (categories.some((c) => c.id !== cat.id && c.name.toLowerCase() === newName.toLowerCase())) {
+      alert("A category with that name already exists."); return;
     }
     try {
       const batch = writeBatch(db);
@@ -536,18 +488,29 @@ export default function Admin({ user }) {
       snap.docs.forEach((d) => batch.update(d.ref, { category: newName }));
       await batch.commit();
       setRenamingCatId(null);
-    } catch {
-      alert("Could not rename category.");
-    }
+    } catch { alert("Could not rename category."); }
   }
 
-  /* ── Rename folder (batch: all matching images) ──────── */
+  /* ── Category / folder descriptions ───────────────────── */
+  async function saveCategoryDescription(cat, desc) {
+    try { await updateDoc(doc(db, "categories", cat.id), { description: desc.trim() }); }
+    catch { alert("Could not save description."); }
+    setEditingDescCatId(null);
+  }
+
+  async function saveFolderDescription(catId, folderName, desc) {
+    try {
+      await updateDoc(doc(db, "categories", catId), {
+        [`folderDescriptions.${folderName}`]: desc.trim(),
+      });
+    } catch { alert("Could not save album description."); }
+    setEditingFolderDesc(null);
+  }
+
+  /* ── Rename folder ─────────────────────────────────────── */
   async function renameFolder(catName, oldFolder, newFolder) {
     newFolder = newFolder.trim();
-    if (!newFolder || newFolder === oldFolder) {
-      setRenamingFolder(null);
-      return;
-    }
+    if (!newFolder || newFolder === oldFolder) { setRenamingFolder(null); return; }
     try {
       const batch = writeBatch(db);
       const q     = query(
@@ -559,16 +522,46 @@ export default function Admin({ user }) {
       snap.docs.forEach((d) => batch.update(d.ref, { folder: newFolder }));
       await batch.commit();
       setRenamingFolder(null);
-    } catch {
-      alert("Could not rename folder.");
+    } catch { alert("Could not rename album."); }
+  }
+
+  /* ── Reviews ───────────────────────────────────────────── */
+  async function addReview() {
+    if (!newReviewName.trim() || !newReviewText.trim()) return;
+    try {
+      setAddingReview(true);
+      await addDoc(collection(db, "reviews"), {
+        name:      newReviewName.trim(),
+        text:      newReviewText.trim(),
+        rating:    newReviewRating,
+        createdAt: serverTimestamp(),
+      });
+      setNewReviewName("");
+      setNewReviewText("");
+      setNewReviewRating(5);
+    } catch { alert("Could not add review."); }
+    finally { setAddingReview(false); }
+  }
+
+  async function deleteReview(review) {
+    if (!window.confirm("Delete this review?")) return;
+    try { await deleteDoc(doc(db, "reviews", review.id)); }
+    catch { alert("Could not delete."); }
+  }
+
+  /* ── Add category inline from upload ───────────────────── */
+  async function addCategoryFromUpload() {
+    const n = newCatInline.trim();
+    if (!n) return;
+    const result = await addCategory(n);
+    if (result || n) {
+      setUploadCat(n);
+      setCreatingCatInline(false);
+      setNewCatInline("");
     }
   }
 
-  /* ── Shorthand ───────────────────────────────────────── */
-  const currentFolders        = foldersByCat[uploadCat] || [];
-  const resolvedUploadFolder  = creatingUploadFolder ? newUploadFolder : uploadFolder;
-
-  /* ─────────────────────────────────────────────────────── */
+  /* ───────────────────────────────────────────────────────── */
   return (
     <div className="admin-page">
       <div className="admin-container">
@@ -580,12 +573,8 @@ export default function Admin({ user }) {
             <p>Signed in as {user.email}</p>
           </div>
           <div className="admin-top-actions">
-            <a className="btn btn-secondary" href="#/">
-              View Website
-            </a>
-            <button className="btn btn-primary" onClick={() => signOut(auth)}>
-              Logout
-            </button>
+            <a className="btn btn-secondary" href="#/">View Website</a>
+            <button className="btn btn-primary" onClick={() => signOut(auth)}>Logout</button>
           </div>
         </div>
 
@@ -593,23 +582,21 @@ export default function Admin({ user }) {
         <div className="admin-panel">
           <h2>Session categories</h2>
           <p>
-            Toggle visibility to show/hide a session on your website. Click the{" "}
-            <strong>pencil</strong> to rename. New categories are hidden by default
-            until you turn them on.
+            Toggle visibility to show/hide on your website. Click ✏️ to rename. Add a short
+            description — it shows on your site below the section title.
           </p>
 
           <div className="admin-cat-list">
             {categories.map((cat) => {
               const count      = countByCat[cat.name] ?? 0;
               const isRenaming = renamingCatId === cat.id;
+              const isEditDesc = editingDescCatId === cat.id;
 
               return (
                 <div key={cat.id} className="admin-cat-row">
                   <div
                     className="admin-cat-dot"
-                    style={{
-                      background: cat.visible ? "var(--green)" : "var(--border)",
-                    }}
+                    style={{ background: cat.visible ? "var(--green)" : "var(--border)" }}
                   />
 
                   <div className="admin-cat-info">
@@ -625,33 +612,44 @@ export default function Admin({ user }) {
                             if (e.key === "Escape") setRenamingCatId(null);
                           }}
                         />
-                        <button
-                          className="admin-icon-btn confirm"
-                          onClick={() => renameCategory(cat, renameCatValue)}
-                          title="Save"
-                        >
-                          <Check size={13} />
-                        </button>
-                        <button
-                          className="admin-icon-btn"
-                          onClick={() => setRenamingCatId(null)}
-                          title="Cancel"
-                        >
-                          <X size={13} />
-                        </button>
+                        <button className="admin-icon-btn confirm" onClick={() => renameCategory(cat, renameCatValue)}><Check size={13} /></button>
+                        <button className="admin-icon-btn" onClick={() => setRenamingCatId(null)}><X size={13} /></button>
                       </div>
                     ) : (
                       <>
                         <span className="admin-cat-name">{cat.name}</span>
                         <span className="admin-cat-count">
                           {count} photo{count !== 1 ? "s" : ""}
-                          {count === 0 && (
-                            <span className="admin-cat-hidden-note">
-                              {" "}· hidden on website
-                            </span>
-                          )}
+                          {count === 0 && <span className="admin-cat-hidden-note"> · hidden on website</span>}
                         </span>
                       </>
+                    )}
+
+                    {/* Description row */}
+                    {!isRenaming && (
+                      isEditDesc ? (
+                        <div className="admin-cat-desc-edit">
+                          <input
+                            value={descValue}
+                            onChange={(e) => setDescValue(e.target.value)}
+                            placeholder="Short description (e.g. Autumn in DC)"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") saveCategoryDescription(cat, descValue);
+                              if (e.key === "Escape") setEditingDescCatId(null);
+                            }}
+                          />
+                          <button className="admin-icon-btn confirm" onClick={() => saveCategoryDescription(cat, descValue)}><Check size={13} /></button>
+                          <button className="admin-icon-btn" onClick={() => setEditingDescCatId(null)}><X size={13} /></button>
+                        </div>
+                      ) : (
+                        <button
+                          className="admin-cat-desc-btn"
+                          onClick={() => { setEditingDescCatId(cat.id); setDescValue(cat.description || ""); }}
+                        >
+                          {cat.description ? `"${cat.description}"` : "+ Add description…"}
+                        </button>
+                      )
                     )}
                   </div>
 
@@ -659,11 +657,8 @@ export default function Admin({ user }) {
                     {!isRenaming && (
                       <button
                         className="admin-cat-rename-btn"
-                        onClick={() => {
-                          setRenamingCatId(cat.id);
-                          setRenameCatValue(cat.name);
-                        }}
-                        title="Rename category"
+                        onClick={() => { setRenamingCatId(cat.id); setRenameCatValue(cat.name); }}
+                        title="Rename"
                       >
                         <Edit2 size={13} />
                       </button>
@@ -671,17 +666,9 @@ export default function Admin({ user }) {
                     <button
                       className="admin-cat-toggle"
                       onClick={() => toggleVisibility(cat)}
-                      title={
-                        cat.visible
-                          ? "Click to hide from website"
-                          : "Click to show on website"
-                      }
+                      title={cat.visible ? "Hide from website" : "Show on website"}
                     >
-                      {cat.visible ? (
-                        <Eye size={15} strokeWidth={1.75} />
-                      ) : (
-                        <EyeOff size={15} strokeWidth={1.75} />
-                      )}
+                      {cat.visible ? <Eye size={15} strokeWidth={1.75} /> : <EyeOff size={15} strokeWidth={1.75} />}
                       <span>{cat.visible ? "Visible" : "Hidden"}</span>
                     </button>
                   </div>
@@ -690,7 +677,6 @@ export default function Admin({ user }) {
             })}
           </div>
 
-          {/* Add new category */}
           <div className="admin-cat-add-form">
             <input
               className="admin-cat-add-input"
@@ -701,11 +687,10 @@ export default function Admin({ user }) {
             />
             <button
               className="btn btn-primary"
-              onClick={addCategory}
+              onClick={() => addCategory()}
               disabled={savingCat || !newCatName.trim()}
             >
-              <Plus size={15} />
-              Add
+              <Plus size={15} /> Add
             </button>
           </div>
         </div>
@@ -713,47 +698,59 @@ export default function Admin({ user }) {
         {/* ── Upload panel ── */}
         <div className="admin-panel">
           <h2>Add photos</h2>
-          <p>
-            Images are auto-compressed before uploading. Assign a category and
-            optionally place them in a folder within that category.
-          </p>
+          <p>Images are auto-compressed. Pick a category, then optionally choose an album and add a caption.</p>
 
-          {/* Category + title */}
-          <div className="admin-fields">
-            <label>
-              Category
-              <select
-                value={uploadCat}
-                onChange={(e) => {
-                  setUploadCat(e.target.value);
-                  setUploadFolder("");
-                  setCreatingUploadFolder(false);
-                  setNewUploadFolder("");
-                }}
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Optional title
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Downtown couples session"
-              />
-            </label>
+          {/* Step 1: Category */}
+          <div className="upload-step">
+            <p className="upload-step-label">
+              <span className="upload-step-num">1</span> Category
+            </p>
+            <div className="admin-upload-cat-chips">
+              {displayCategories.map((cat) => (
+                <button
+                  key={cat.id}
+                  className={`admin-cat-chip${uploadCat === cat.name ? " selected" : ""}`}
+                  onClick={() => {
+                    setUploadCat(cat.name);
+                    setUploadFolder("");
+                    setCreatingUploadFolder(false);
+                    setNewUploadFolder("");
+                    setCreatingCatInline(false);
+                  }}
+                >
+                  {cat.name}
+                </button>
+              ))}
+              {!creatingCatInline ? (
+                <button
+                  className="admin-cat-chip new-chip"
+                  onClick={() => setCreatingCatInline(true)}
+                >
+                  <Plus size={13} /> New
+                </button>
+              ) : (
+                <div className="admin-folder-input-row" style={{ marginTop: 8, width: "100%" }}>
+                  <input
+                    className="admin-folder-input"
+                    value={newCatInline}
+                    onChange={(e) => setNewCatInline(e.target.value)}
+                    placeholder="Category name…"
+                    autoFocus
+                    onKeyDown={(e) => e.key === "Enter" && addCategoryFromUpload()}
+                  />
+                  <button className="admin-folder-save-btn" onClick={addCategoryFromUpload}>Add</button>
+                  <button className="admin-folder-cancel-btn" onClick={() => { setCreatingCatInline(false); setNewCatInline(""); }}>✕</button>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Folder selection */}
-          <div className="admin-folder-row">
-            <FolderPlus size={15} color="var(--gray)" />
-            <span className="admin-folder-row-label">Folder</span>
-
+          {/* Step 2: Album */}
+          <div className="upload-step">
+            <p className="upload-step-label">
+              <span className="upload-step-num">2</span> Album
+              <span className="upload-step-optional">optional</span>
+            </p>
             {!creatingUploadFolder ? (
               <select
                 className="admin-folder-select"
@@ -767,13 +764,11 @@ export default function Admin({ user }) {
                   }
                 }}
               >
-                <option value="">No folder (general)</option>
+                <option value="">No album (general)</option>
                 {currentFolders.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
+                  <option key={f} value={f}>{f}</option>
                 ))}
-                <option value="__new__">+ Create new folder…</option>
+                <option value="__new__">+ Create new album…</option>
               </select>
             ) : (
               <div className="admin-folder-input-row">
@@ -781,32 +776,35 @@ export default function Admin({ user }) {
                   className="admin-folder-input"
                   value={newUploadFolder}
                   onChange={(e) => setNewUploadFolder(e.target.value)}
-                  placeholder="Folder name (e.g. Summer 2025)"
+                  placeholder="Album name (e.g. Autumn in DC)"
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && newUploadFolder.trim())
                       setCreatingUploadFolder(false);
                   }}
                 />
-                <button
-                  className="admin-folder-save-btn"
-                  onClick={() => {
-                    if (newUploadFolder.trim()) setCreatingUploadFolder(false);
-                  }}
-                >
+                <button className="admin-folder-save-btn" onClick={() => { if (newUploadFolder.trim()) setCreatingUploadFolder(false); }}>
                   Save
                 </button>
-                <button
-                  className="admin-folder-cancel-btn"
-                  onClick={() => {
-                    setCreatingUploadFolder(false);
-                    setNewUploadFolder("");
-                  }}
-                >
+                <button className="admin-folder-cancel-btn" onClick={() => { setCreatingUploadFolder(false); setNewUploadFolder(""); }}>
                   ✕
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Step 3: Caption */}
+          <div className="upload-step">
+            <p className="upload-step-label">
+              <span className="upload-step-num">3</span> Caption
+              <span className="upload-step-optional">optional</span>
+            </p>
+            <input
+              className="admin-cat-add-input"
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder="e.g. Golden hour session at Lincoln Memorial"
+            />
           </div>
 
           {/* Drop zone */}
@@ -814,31 +812,19 @@ export default function Admin({ user }) {
             className={dragOver ? "drop-zone drag-active" : "drop-zone"}
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragOver(false);
-              uploadFiles(e.dataTransfer.files);
-            }}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); uploadFiles(e.dataTransfer.files); }}
           >
             <UploadCloud size={40} strokeWidth={1.25} />
-            <strong>Drop images here</strong>
+            <strong>Drop photos here</strong>
             <span>or tap to choose files</span>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={(e) => uploadFiles(e.target.files)}
-            />
+            <input type="file" accept="image/*" multiple onChange={(e) => uploadFiles(e.target.files)} />
           </label>
 
           {uploadCat && (
             <p className="admin-upload-destination">
-              → Uploading to <strong>{uploadCat}</strong>
-              {resolvedUploadFolder && (
-                <>
-                  {" "}› folder <strong>{resolvedUploadFolder}</strong>
-                </>
-              )}
+              → <strong>{uploadCat}</strong>
+              {resolvedUploadFolder && <> › <strong>{resolvedUploadFolder}</strong></>}
+              {caption && <> · "{caption}"</>}
             </p>
           )}
 
@@ -852,48 +838,38 @@ export default function Admin({ user }) {
 
         {/* ── Gallery ── */}
         <div className="admin-gallery-section">
-          <h2>
-            Gallery ({images.length} photo{images.length !== 1 ? "s" : ""})
-          </h2>
+          <h2>Gallery ({images.length} photo{images.length !== 1 ? "s" : ""})</h2>
 
-          {/* Category filter tabs */}
           <div className="admin-gallery-filters">
             {["All", ...categoryNames].map((cat) => (
               <button
                 key={cat}
-                className={`admin-gallery-filter-btn${
-                  galleryFilter === cat ? " active" : ""
-                }`}
+                className={`admin-gallery-filter-btn${galleryFilter === cat ? " active" : ""}`}
                 onClick={() => setGalleryFilter(cat)}
               >
                 {cat}
-                <span className="admin-filter-count">
-                  {countByCat[cat] ?? 0}
-                </span>
+                <span className="admin-filter-count">{countByCat[cat] ?? 0}</span>
               </button>
             ))}
           </div>
 
-          {/* Folder rename section — visible when a specific category is selected */}
-          {galleryFilter !== "All" &&
-            foldersByCat[galleryFilter]?.length > 0 && (
-              <div className="admin-folder-rename-section">
-                <p className="admin-folder-rename-header">
-                  <FolderPlus size={13} />
-                  Folders in {galleryFilter} — click pencil to rename
-                </p>
-                <div className="admin-folder-rename-list">
-                  {foldersByCat[galleryFilter].map((folder) => {
-                    const isRenamingThis =
-                      renamingFolder?.catName === galleryFilter &&
-                      renamingFolder?.oldName  === folder;
-                    const folderCount = images.filter(
-                      (img) =>
-                        img.category === galleryFilter && img.folder === folder
-                    ).length;
+          {/* Album management — shown when filtering by category */}
+          {galleryFilter !== "All" && foldersByCat[galleryFilter]?.length > 0 && (
+            <div className="admin-folder-rename-section">
+              <p className="admin-folder-rename-header">
+                Albums in {galleryFilter} — rename or add a description
+              </p>
+              <div className="admin-folder-rename-list">
+                {foldersByCat[galleryFilter].map((folder) => {
+                  const catObj        = categories.find((c) => c.name === galleryFilter);
+                  const isRenamingThis = renamingFolder?.catName === galleryFilter && renamingFolder?.oldName === folder;
+                  const isEditingDesc  = editingFolderDesc?.catId === catObj?.id && editingFolderDesc?.folderName === folder;
+                  const existingDesc   = catObj?.folderDescriptions?.[folder] || "";
+                  const folderCount    = images.filter((img) => img.category === galleryFilter && img.folder === folder).length;
 
-                    return (
-                      <div key={folder} className="admin-folder-rename-row">
+                  return (
+                    <div key={folder} className="admin-folder-rename-row-wrap">
+                      <div className="admin-folder-rename-row">
                         {isRenamingThis ? (
                           <>
                             <input
@@ -902,56 +878,61 @@ export default function Admin({ user }) {
                               autoFocus
                               onChange={(e) => setRenameFolderValue(e.target.value)}
                               onKeyDown={(e) => {
-                                if (e.key === "Enter")
-                                  renameFolder(galleryFilter, folder, renameFolderValue);
-                                if (e.key === "Escape")
-                                  setRenamingFolder(null);
+                                if (e.key === "Enter") renameFolder(galleryFilter, folder, renameFolderValue);
+                                if (e.key === "Escape") setRenamingFolder(null);
                               }}
                             />
-                            <button
-                              className="admin-icon-btn confirm"
-                              onClick={() =>
-                                renameFolder(galleryFilter, folder, renameFolderValue)
-                              }
-                            >
-                              <Check size={13} />
-                            </button>
-                            <button
-                              className="admin-icon-btn"
-                              onClick={() => setRenamingFolder(null)}
-                            >
-                              <X size={13} />
-                            </button>
+                            <button className="admin-icon-btn confirm" onClick={() => renameFolder(galleryFilter, folder, renameFolderValue)}><Check size={13} /></button>
+                            <button className="admin-icon-btn" onClick={() => setRenamingFolder(null)}><X size={13} /></button>
                           </>
                         ) : (
                           <>
-                            <span className="admin-folder-rename-name">
-                              📁 {folder}
-                            </span>
-                            <span className="admin-folder-rename-count">
-                              {folderCount} photo{folderCount !== 1 ? "s" : ""}
-                            </span>
+                            <span className="admin-folder-rename-name">📁 {folder}</span>
+                            <span className="admin-folder-rename-count">{folderCount} photo{folderCount !== 1 ? "s" : ""}</span>
                             <button
                               className="admin-icon-btn"
-                              onClick={() => {
-                                setRenamingFolder({
-                                  catName: galleryFilter,
-                                  oldName: folder,
-                                });
-                                setRenameFolderValue(folder);
-                              }}
-                              title="Rename folder"
+                              onClick={() => { setRenamingFolder({ catName: galleryFilter, oldName: folder }); setRenameFolderValue(folder); }}
+                              title="Rename album"
                             >
                               <Edit2 size={13} />
                             </button>
                           </>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
+
+                      {/* Album description */}
+                      {catObj && (
+                        isEditingDesc ? (
+                          <div className="admin-cat-desc-edit" style={{ marginTop: 6 }}>
+                            <input
+                              value={folderDescValue}
+                              onChange={(e) => setFolderDescValue(e.target.value)}
+                              placeholder="Album description (shows on website)…"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveFolderDescription(catObj.id, folder, folderDescValue);
+                                if (e.key === "Escape") setEditingFolderDesc(null);
+                              }}
+                            />
+                            <button className="admin-icon-btn confirm" onClick={() => saveFolderDescription(catObj.id, folder, folderDescValue)}><Check size={13} /></button>
+                            <button className="admin-icon-btn" onClick={() => setEditingFolderDesc(null)}><X size={13} /></button>
+                          </div>
+                        ) : (
+                          <button
+                            className="admin-cat-desc-btn"
+                            style={{ marginTop: 5, marginLeft: 4 }}
+                            onClick={() => { setEditingFolderDesc({ catId: catObj.id, folderName: folder }); setFolderDescValue(existingDesc); }}
+                          >
+                            {existingDesc ? `"${existingDesc}"` : "+ Add album description…"}
+                          </button>
+                        )
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            )}
+            </div>
+          )}
 
           {filteredImages.length === 0 ? (
             <p className="admin-empty">
@@ -965,7 +946,7 @@ export default function Admin({ user }) {
                 <AdminImageCard
                   key={img.id}
                   image={img}
-                  allCategories={categories}
+                  allCategories={categories.length > 0 ? categories : displayCategories}
                   foldersForCat={foldersByCat[img.category] || []}
                   onDelete={deleteImage}
                   onCategoryChange={changeCat}
@@ -975,6 +956,80 @@ export default function Admin({ user }) {
               ))}
             </div>
           )}
+        </div>
+
+        {/* ── Client Reviews ── */}
+        <div className="admin-panel">
+          <div className="admin-reviews-header">
+            <div>
+              <h2>Client Reviews</h2>
+              <p>Add testimonials from happy clients — they show on your public website.</p>
+            </div>
+            <MessageSquare size={22} strokeWidth={1.5} color="var(--gray)" />
+          </div>
+
+          {/* Existing reviews */}
+          {reviews.length > 0 && (
+            <div className="admin-reviews-list">
+              {reviews.map((r) => (
+                <div key={r.id} className="admin-review-row">
+                  <div className="admin-review-stars">
+                    {"★".repeat(r.rating || 5)}{"☆".repeat(5 - (r.rating || 5))}
+                  </div>
+                  <p className="admin-review-text">"{r.text}"</p>
+                  <p className="admin-review-name">— {r.name}</p>
+                  <button
+                    className="admin-review-delete"
+                    onClick={() => deleteReview(r)}
+                    title="Delete review"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add review form */}
+          <div className="admin-add-review-form">
+            <p className="upload-step-label" style={{ marginBottom: 12 }}>
+              <span className="upload-step-num">+</span> Add a review
+            </p>
+
+            <div className="admin-fields" style={{ marginBottom: 12 }}>
+              <label>
+                Client name
+                <input
+                  value={newReviewName}
+                  onChange={(e) => setNewReviewName(e.target.value)}
+                  placeholder="e.g. Sarah M."
+                />
+              </label>
+              <label>
+                Rating
+                <StarPicker value={newReviewRating} onChange={setNewReviewRating} />
+              </label>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+              <label style={{ fontSize: "0.8rem", fontWeight: 500, color: "var(--gray)" }}>Review text</label>
+              <textarea
+                className="admin-review-textarea"
+                value={newReviewText}
+                onChange={(e) => setNewReviewText(e.target.value)}
+                placeholder="What did they say about your work?"
+                rows={3}
+              />
+            </div>
+
+            <button
+              className="btn btn-primary"
+              onClick={addReview}
+              disabled={addingReview || !newReviewName.trim() || !newReviewText.trim()}
+            >
+              <Plus size={15} /> Add Review
+            </button>
+          </div>
         </div>
 
       </div>
