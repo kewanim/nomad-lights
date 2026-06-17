@@ -332,8 +332,68 @@ export default function PublicSite() {
     return map;
   }, [activeCategories, allImages]);
 
-  // Hero: most recent real photo. Null while loading (no flash).
-  const heroImage = loading ? null : (allImages[0]?.imageUrl || null);
+  // Hero carousel — ordered: for each photo-index, cycle through all album
+  // positions across all categories, then advance to the next photo-index.
+  const heroSlides = useMemo(() => {
+    if (allImages.length === 0) return [];
+
+    // Build catName → albumKey → [photos] map
+    const catAlbumMap = {};
+    activeCategories.forEach((cat) => { catAlbumMap[cat.name] = {}; });
+    allImages.forEach((img) => {
+      const cat = img.category;
+      if (!catAlbumMap[cat]) catAlbumMap[cat] = {};
+      const album = (img.folder || "").trim() || "__none__";
+      if (!catAlbumMap[cat][album]) catAlbumMap[cat][album] = [];
+      catAlbumMap[cat][album].push(img);
+    });
+
+    // Sort albums per category: no-album first, then alphabetical
+    const catNames = activeCategories.map((c) => c.name);
+    const catAlbums = {};
+    catNames.forEach((cat) => {
+      catAlbums[cat] = Object.keys(catAlbumMap[cat] || {}).sort((a, b) => {
+        if (a === "__none__") return -1;
+        if (b === "__none__") return 1;
+        return a.localeCompare(b);
+      });
+    });
+
+    const maxAlbumPos = Math.max(...catNames.map((c) => catAlbums[c].length), 0);
+    const maxPhotoIdx = Math.max(
+      ...catNames.flatMap((c) =>
+        catAlbums[c].map((album) => (catAlbumMap[c]?.[album] || []).length)
+      ),
+      0
+    );
+
+    const slides = [];
+    for (let photoIdx = 0; photoIdx < maxPhotoIdx; photoIdx++) {
+      for (let albumPos = 0; albumPos < maxAlbumPos; albumPos++) {
+        for (const cat of catNames) {
+          const albums = catAlbums[cat] || [];
+          if (albumPos >= albums.length) continue;
+          const album = albums[albumPos];
+          const photos = catAlbumMap[cat]?.[album] || [];
+          if (photoIdx >= photos.length) continue;
+          slides.push({
+            id: `${photos[photoIdx].id}-${photoIdx}`,
+            imageUrl: photos[photoIdx].imageUrl,
+            category: cat,
+            album: album === "__none__" ? "" : album,
+          });
+        }
+      }
+    }
+    return slides;
+  }, [allImages, activeCategories]);
+
+  const [heroIdx, setHeroIdx] = useState(0);
+  useEffect(() => {
+    if (heroSlides.length <= 1) return;
+    const t = setInterval(() => setHeroIdx((i) => (i + 1) % heroSlides.length), 4500);
+    return () => clearInterval(t);
+  }, [heroSlides.length]);
 
   // About: second real photo, or fallback after load
   const aboutImage = loading
@@ -403,14 +463,28 @@ export default function PublicSite() {
             <div className="hero-image-wrap">
               {loading ? (
                 <div className="skeleton hero-img-skeleton" />
-              ) : heroImage ? (
-                <img src={heroImage} alt="Nomad Lights featured work" loading="eager" />
+              ) : heroSlides.length > 0 ? (
+                <>
+                  {heroSlides.map((slide, i) => (
+                    <img
+                      key={slide.id}
+                      src={slide.imageUrl}
+                      alt={`${slide.category}${slide.album ? ` — ${slide.album}` : ""}`}
+                      className={`hero-carousel-img${i === heroIdx ? " active" : ""}`}
+                      loading={i === 0 ? "eager" : "lazy"}
+                    />
+                  ))}
+                  <div className="hero-slide-label">
+                    <span className="hero-slide-cat">{heroSlides[heroIdx].category}</span>
+                    {heroSlides[heroIdx].album && (
+                      <span className="hero-slide-album"> · {heroSlides[heroIdx].album}</span>
+                    )}
+                  </div>
+                </>
               ) : (
-                /* No photos yet — neutral placeholder, no Unsplash flash */
                 <div style={{
                   width: "100%", height: "100%",
                   background: "var(--light)",
-                  borderRadius: "var(--radius-lg)",
                   display: "flex", alignItems: "center", justifyContent: "center"
                 }}>
                   <Camera size={40} strokeWidth={1} color="var(--border)" />
