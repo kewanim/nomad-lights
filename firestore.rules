@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Gallery images: public read, authenticated write
+    match /gallery/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Categories: public read, authenticated write
+    match /categories/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Reviews / testimonials: public read, authenticated write
+    match /reviews/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
