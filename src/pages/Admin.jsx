@@ -291,24 +291,25 @@ export default function Admin({ user }) {
 
   /* ── Seed default categories on first load ─────────────── */
   useEffect(() => {
-    async function seedIfEmpty() {
+    async function seedMissing() {
       try {
         const snap = await getDocs(collection(db, "categories"));
-        if (snap.empty) {
-          for (let i = 0; i < DEFAULT_CATEGORIES.length; i++) {
-            await addDoc(collection(db, "categories"), {
-              name:      DEFAULT_CATEGORIES[i],
-              visible:   true,
-              order:     i,
-              createdAt: serverTimestamp(),
-            });
-          }
+        const existing = new Set(snap.docs.map((d) => d.data().name?.toLowerCase()));
+        const missing = DEFAULT_CATEGORIES.filter((n) => !existing.has(n.toLowerCase()));
+        const startOrder = snap.docs.length;
+        for (let i = 0; i < missing.length; i++) {
+          await addDoc(collection(db, "categories"), {
+            name:      missing[i],
+            visible:   true,
+            order:     startOrder + i,
+            createdAt: serverTimestamp(),
+          });
         }
       } catch (e) {
         console.warn("Could not seed categories:", e);
       }
     }
-    seedIfEmpty();
+    seedMissing();
   }, []);
 
   /* ── Listen: categories ────────────────────────────────── */
@@ -468,7 +469,7 @@ export default function Admin({ user }) {
     try {
       setSavingCat(true);
       await addDoc(collection(db, "categories"), {
-        name: n, visible: false, order: categories.length, createdAt: serverTimestamp(),
+        name: n, visible: true, order: categories.length, createdAt: serverTimestamp(),
       });
       if (!name) setNewCatName("");
       return n;
